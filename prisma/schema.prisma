@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Trade {
+  id            String    @id @default(cuid())
+  createdAt     DateTime  @default(now())
+  instrument    String    @default("NAS100")
+  direction     Direction
+  entryTime     DateTime
+  entryPrice    Float
+  stopPrice     Float
+  targetPrice   Float
+  exitPrice     Float
+  mfePrice      Float?
+  rrPlanned     Float
+  rrAchieved    Float
+  rrPotential   Float?
+  result        Result
+  patternId     String
+  pattern       Pattern   @relation(fields: [patternId], references: [id])
+  screenshotUrl String?
+  notes         String?
+}
+
+model Pattern {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  trades      Trade[]
+}
+
+enum Direction {
+  LONG
+  SHORT
+}
+
+enum Result {
+  WIN
+  LOSS
+  BREAKEVEN
+}
