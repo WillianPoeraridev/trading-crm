@@ -169,7 +169,9 @@ void ReplayLoop()
 
       //--- ajusta time_msc / time para preservar microestrutura
       ResetLastError();
-      int added = CustomTicksAdd(DestSymbol, t);
+      MqlTick tickArr[1];
+      tickArr[0] = t;
+      int added = CustomTicksAdd(DestSymbol, tickArr);
       if(added <= 0)
          PrintFormat("[ReplayEngine] CustomTicksAdd falhou no cursor %d (erro=%d)", g_cursor, GetLastError());
 
