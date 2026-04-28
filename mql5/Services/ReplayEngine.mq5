@@ -58,6 +58,8 @@ void OnStart()
    g_startTime = ComputeStartTime(SessionDate);
    PrintFormat("[ReplayEngine] Início do replay: %s (epoch %I64d)", TimeToString(g_startTime, TIME_DATE|TIME_SECONDS), (long)g_startTime);
 
+   LoadHistoricalBars();
+
    if(!LoadTicks(g_startTime))
    {
       PrintFormat("[ReplayEngine] Falha ao carregar ticks de %s", SourceSymbol);
@@ -124,6 +126,50 @@ datetime ComputeStartTime(datetime base)
    dt.min  = OpeningMinute;
    dt.sec  = 0;
    return StructToTime(dt);
+}
+
+//+------------------------------------------------------------------+
+//| Copia barras M1 dos últimos 30 dias do símbolo de origem e      |
+//| insere no custom symbol para dar contexto histórico ao gráfico  |
+//+------------------------------------------------------------------+
+bool LoadHistoricalBars()
+{
+   MqlRates rates[];
+   ArraySetAsSeries(rates, false);
+
+   int copied = CopyRates(SourceSymbol, PERIOD_M1, 0, 43200, rates); // 30d * 24h * 60min
+   if(copied <= 0)
+   {
+      PrintFormat("[ReplayEngine] CopyRates falhou (copied=%d, erro=%d)", copied, GetLastError());
+      return false;
+   }
+
+   ulong startMs = (ulong)g_startTime * 1000UL;
+   int cutIdx = copied;
+   for(int i = 0; i < copied; i++)
+   {
+      if((ulong)rates[i].time * 1000UL >= startMs)
+      {
+         cutIdx = i;
+         break;
+      }
+   }
+
+   if(cutIdx <= 0)
+   {
+      Print("[ReplayEngine] Nenhuma barra histórica anterior ao início do replay");
+      return true;
+   }
+
+   MqlRates historical[];
+   ArrayCopy(historical, rates, 0, 0, cutIdx);
+
+   int added = CustomRatesUpdate(DestSymbol, historical);
+   PrintFormat("[ReplayEngine] %d barras M1 históricas carregadas no %s (de %s até %s)",
+               added, DestSymbol,
+               TimeToString(historical[0].time, TIME_DATE|TIME_MINUTES),
+               TimeToString(historical[cutIdx-1].time, TIME_DATE|TIME_MINUTES));
+   return added > 0;
 }
 
 //+------------------------------------------------------------------+
