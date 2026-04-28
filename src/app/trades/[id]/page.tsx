@@ -29,7 +29,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
     { label: 'R Planejado', value: `${trade.rrPlanned.toFixed(2)}R` },
     { label: 'R Obtido', value: `${trade.rrAchieved.toFixed(2)}R` },
     { label: 'R Potencial', value: trade.rrPotential ? `${trade.rrPotential.toFixed(2)}R` : '—' },
-    { label: 'Padrão', value: trade.pattern.name },
+    { label: 'Padrão', value: trade.pattern?.name ?? '—' },
     { label: 'Resultado', value: trade.result },
   ]
 

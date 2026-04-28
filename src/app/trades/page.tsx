@@ -55,7 +55,7 @@ export default async function TradesPage() {
                       {trade.direction}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3">{trade.pattern.name}</td>
+                  <td className="px-4 py-3">{trade.pattern?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-right">{trade.rrPlanned.toFixed(2)}R</td>
                   <td className="px-4 py-3 text-right">{trade.rrAchieved.toFixed(2)}R</td>
                   <td className="px-4 py-3">
