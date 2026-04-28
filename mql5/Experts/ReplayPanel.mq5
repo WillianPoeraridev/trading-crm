@@ -330,6 +330,7 @@ void ClosePosition(double exitPrice, string reason, const MqlTick &t)
 
    TakeScreenshot("close_" + reason + "_" + IntegerToString((int)exitTime));
 
+   ComputePostExitMaeMfe(exitTime);
    string json = BuildJson(exitPrice, reason, exitTime, durationMin, pnl, resultR);
    SendTradeToApi(json);
 
@@ -504,20 +505,54 @@ void SendTradeToApi(const string json)
 }
 
 //+------------------------------------------------------------------+
-//| SaveFallbackCsv — uma linha JSON por trade                       |
+//| SaveFallbackCsv — uma linha JSON por trade (acumula sem truncar) |
 //+------------------------------------------------------------------+
 void SaveFallbackCsv(const string json)
 {
-   int flags = FILE_WRITE | FILE_TXT | FILE_ANSI;
-   if(FileIsExist(FALLBACK_CSV))
-      flags |= FILE_READ; // necessário para não truncar ao abrir para seek
-
-   int h = FileOpen(FALLBACK_CSV, FILE_WRITE | FILE_TXT | FILE_ANSI);
+   int h = FileOpen(FALLBACK_CSV, FILE_WRITE | FILE_READ | FILE_TXT | FILE_ANSI);
    if(h == INVALID_HANDLE) { Print("[ReplayPanel] Falha ao abrir CSV fallback"); return; }
    FileSeek(h, 0, SEEK_END);
    FileWriteString(h, json + "\n");
    FileClose(h);
    Print("[ReplayPanel] Trade salvo em ", FALLBACK_CSV);
+}
+
+//+------------------------------------------------------------------+
+//| ComputePostExitMaeMfe — varre ticks após saída (retroativo)      |
+//+------------------------------------------------------------------+
+void ComputePostExitMaeMfe(datetime exitTime)
+{
+   MqlTick postTicks[];
+   ulong startMs = (ulong)exitTime * 1000UL;
+
+   int copied = CopyTicks(SourceSymbol, postTicks, COPY_TICKS_ALL, startMs, 200000);
+   if(copied <= 0) return;
+
+   for(int i = 0; i < copied; i++)
+   {
+      double fav, adv;
+      if(g_pos.direction == "LONG")
+      {
+         fav = (postTicks[i].bid - g_pos.entryPrice) / g_point;
+         adv = (g_pos.entryPrice - postTicks[i].bid) / g_point;
+      }
+      else
+      {
+         fav = (g_pos.entryPrice - postTicks[i].ask) / g_point;
+         adv = (postTicks[i].ask - g_pos.entryPrice) / g_point;
+      }
+
+      if(fav > g_pos.mfePts) g_pos.mfePts = fav;
+      if(adv > g_pos.maePts) g_pos.maePts = adv;
+
+      for(int r = 1; r <= 5; r++)
+         if(!g_pos.hit[r] && g_pos.mfePts >= r * g_pos.slPoints)
+            g_pos.hit[r] = true;
+   }
+
+   PrintFormat("[ReplayPanel] Pós-saída: MFE=%.1f pts MAE=%.1f pts | hit1R=%s hit2R=%s hit3R=%s",
+               g_pos.mfePts, g_pos.maePts,
+               BoolStr(g_pos.hit[1]), BoolStr(g_pos.hit[2]), BoolStr(g_pos.hit[3]));
 }
 
 //+------------------------------------------------------------------+
