@@ -578,25 +578,28 @@ void TakeScreenshot(const string prefix)
 }
 
 //+------------------------------------------------------------------+
+//| CreateHLine — cria ou recria uma linha horizontal                |
+//+------------------------------------------------------------------+
+void CreateHLine(const string name, double price, color clr, const string lbl)
+{
+   ObjectDelete(0, name);
+   ObjectCreate(0, name, OBJ_HLINE, 0, 0, price);
+   ObjectSetInteger(0, name, OBJPROP_COLOR,      clr);
+   ObjectSetInteger(0, name, OBJPROP_STYLE,      STYLE_DASH);
+   ObjectSetInteger(0, name, OBJPROP_WIDTH,      1);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
+   ObjectSetInteger(0, name, OBJPROP_BACK,       false);
+   ObjectSetString (0, name, OBJPROP_TEXT,       lbl);
+}
+
+//+------------------------------------------------------------------+
 //| DrawLines — SL, TP e entrada                                     |
 //+------------------------------------------------------------------+
 void DrawLines(double entry, double sl, double tp)
 {
-   auto HLine = [](string name, double price, color clr, string lbl)
-   {
-      ObjectDelete(0, name);
-      ObjectCreate(0, name, OBJ_HLINE, 0, 0, price);
-      ObjectSetInteger(0, name, OBJPROP_COLOR,     clr);
-      ObjectSetInteger(0, name, OBJPROP_STYLE,     STYLE_DASH);
-      ObjectSetInteger(0, name, OBJPROP_WIDTH,     1);
-      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
-      ObjectSetInteger(0, name, OBJPROP_BACK,      false);
-      ObjectSetString (0, name, OBJPROP_TEXT,      lbl);
-   };
-
-   HLine(EN_LINE, entry, clrDodgerBlue, "Entrada");
-   HLine(SL_LINE, sl,    clrRed,         "SL");
-   HLine(TP_LINE, tp,    clrLime,        "TP");
+   CreateHLine(EN_LINE, entry, clrDodgerBlue, "Entrada");
+   CreateHLine(SL_LINE, sl,    clrRed,        "SL");
+   CreateHLine(TP_LINE, tp,    clrLime,        "TP");
 }
 
 //+------------------------------------------------------------------+
