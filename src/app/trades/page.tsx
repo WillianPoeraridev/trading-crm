@@ -142,10 +142,10 @@ export default async function TradesPage({
     orderBy: { entryTime: 'desc' },
   })
 
-  const filterLinks = [
-    { label: 'Todos', value: undefined },
-    { label: 'Simulador', value: 'SIMULATOR' },
-    { label: 'Real', value: 'REAL' },
+  const tabs = [
+    { label: 'Simulador', value: 'SIMULATOR' as const },
+    { label: 'Real', value: 'REAL' as const },
+    { label: 'Visão Geral', value: undefined },
   ]
 
   return (
@@ -153,6 +153,9 @@ export default async function TradesPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Trades</h1>
         <div className="flex gap-2">
+          <Link href="/trades/metrics" className={buttonVariants({ variant: 'outline' })}>
+            Métricas
+          </Link>
           <Link href="/trades/import-csv" className={buttonVariants({ variant: 'outline' })}>
             Importar CSV
           </Link>
@@ -162,18 +165,22 @@ export default async function TradesPage({
         </div>
       </div>
 
-      {/* Source filter */}
-      <div className="flex gap-2">
-        {filterLinks.map(({ label, value }) => {
+      {/* Tabs by source */}
+      <div role="tablist" className="flex border-b">
+        {tabs.map(({ label, value }) => {
           const href = value ? `/trades?source=${value}` : '/trades'
           const active = source === value || (!source && !value)
           return (
             <Link
               key={label}
               href={href}
+              role="tab"
+              aria-selected={active}
               className={cn(
-                buttonVariants({ variant: active ? 'default' : 'outline' }),
-                'h-8 text-xs px-3',
+                'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                active
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
               {label}

@@ -23,6 +23,7 @@ export default function RootLayout({
           <nav className="flex gap-4 text-sm">
             <Link href="/" className="hover:underline">Dashboard</Link>
             <Link href="/trades" className="hover:underline">Trades</Link>
+            <Link href="/trades/metrics" className="hover:underline">Métricas</Link>
           </nav>
         </header>
         <main className="flex-1 p-6">{children}</main>
