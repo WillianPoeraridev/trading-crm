@@ -159,9 +159,6 @@ export default async function TradesPage({
           <Link href="/trades/import-csv" className={buttonVariants({ variant: 'outline' })}>
             Importar CSV
           </Link>
-          <Link href="/trades/new" className={buttonVariants()}>
-            Novo Trade
-          </Link>
         </div>
       </div>
 
@@ -191,11 +188,7 @@ export default async function TradesPage({
 
       {trades.length === 0 ? (
         <p className="text-muted-foreground text-center py-16">
-          Nenhum trade registrado ainda.{' '}
-          <Link href="/trades/new" className="underline">
-            Registrar o primeiro
-          </Link>
-          .
+          Nenhum trade registrado ainda.
         </p>
       ) : source === 'SIMULATOR' ? (
         /* grouped view */
