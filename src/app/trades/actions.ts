@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { calcRR } from '@/lib/calcRR'
 
 const tradeSchema = z.object({
   instrument: z.string().default('NAS100'),
@@ -17,21 +18,6 @@ const tradeSchema = z.object({
   screenshotUrl: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 })
-
-function calcRR(direction: 'LONG' | 'SHORT', entry: number, stop: number, target: number, exit: number, mfe?: number | null) {
-  const risk = direction === 'LONG' ? entry - stop : stop - entry
-  if (risk <= 0) throw new Error('Stop inválido em relação à entrada')
-
-  const sign = direction === 'LONG' ? 1 : -1
-  const rrPlanned = (sign * (target - entry)) / risk
-  const rrAchieved = (sign * (exit - entry)) / risk
-  const rrPotential = mfe != null ? (sign * (mfe - entry)) / risk : null
-
-  const result =
-    rrAchieved > 0.05 ? 'WIN' : rrAchieved < -0.05 ? 'LOSS' : 'BREAKEVEN'
-
-  return { rrPlanned, rrAchieved, rrPotential, result } as const
-}
 
 export async function createTrade(formData: FormData) {
   const raw = Object.fromEntries(formData.entries())

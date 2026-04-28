@@ -7,24 +7,38 @@ datasource db {
 }
 
 model Trade {
-  id            String    @id @default(cuid())
-  createdAt     DateTime  @default(now())
-  instrument    String    @default("NAS100")
-  direction     Direction
-  entryTime     DateTime
-  entryPrice    Float
-  stopPrice     Float
-  targetPrice   Float
-  exitPrice     Float
-  mfePrice      Float?
-  rrPlanned     Float
-  rrAchieved    Float
-  rrPotential   Float?
-  result        Result
-  patternId     String
-  pattern       Pattern   @relation(fields: [patternId], references: [id])
-  screenshotUrl String?
-  notes         String?
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  instrument      String      @default("NAS100")
+  direction       Direction
+  source          Source      @default(SIMULATOR)
+  exitReason      ExitReason  @default(MANUAL)
+  entryTime       DateTime
+  sessionDate     DateTime?
+  entryPrice      Float
+  stopPrice       Float
+  targetPrice     Float
+  exitPrice       Float
+  mfePrice        Float?
+  mfePoints       Float?
+  mae             Float?
+  maePoints       Float?
+  rrPlanned       Float
+  rrAchieved      Float
+  rrPotential     Float?
+  result          Result
+  contractsQty    Int         @default(1)
+  commission      Float?
+  pnlGross        Float?
+  pnlNet          Float?
+  ratingSetup     Int?
+  ratingExecution Int?
+  followedPlan    Boolean     @default(false)
+  tags            String?
+  patternId       String?
+  pattern         Pattern?    @relation(fields: [patternId], references: [id])
+  screenshotUrl   String?
+  notes           String?
 }
 
 model Pattern {
@@ -43,4 +57,15 @@ enum Result {
   WIN
   LOSS
   BREAKEVEN
+}
+
+enum Source {
+  SIMULATOR
+  REAL
+}
+
+enum ExitReason {
+  SL
+  TP
+  MANUAL
 }
