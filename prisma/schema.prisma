@@ -35,6 +35,11 @@ model Trade {
   ratingExecution Int?
   followedPlan    Boolean     @default(false)
   tags            String?
+  hit1R           Boolean?
+  hit2R           Boolean?
+  hit3R           Boolean?
+  hit4R           Boolean?
+  hit5R           Boolean?
   patternId       String?
   pattern         Pattern?    @relation(fields: [patternId], references: [id])
   screenshotUrl   String?
