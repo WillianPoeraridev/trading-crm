@@ -16,8 +16,8 @@ input string   ApiUrl        = "https://trading-crm-main.vercel.app/api/trades";
 input string   ApiKey        = "nas100-sim-2026";
 input double   StartCapital  = 600.0;
 input double   RiskPercent   = 14.0;
-input int      DefaultSLpts  = 400;
-input int      DefaultTPpts  = 800;
+input double   DefaultSLprice = 4.00;  // distância do SL em preço (ex: 4.00 = 400pts NAS100)
+input double   DefaultTPprice = 8.00;  // distância do TP em preço
 input string   DestSymbol    = "NAS100_SIM";
 input string   SourceSymbol  = "NAS100";
 
@@ -59,8 +59,8 @@ struct VirtualPosition
    double   entryPrice;
    double   slPrice;
    double   tpPrice;
-   int      slPoints;
-   int      tpPoints;
+   double   slDist;
+   double   tpDist;
    double   lotSize;
    double   riskUsd;
    double   capitalAtEntry;
@@ -73,8 +73,8 @@ struct VirtualPosition
 //| Globals                                                          |
 //+------------------------------------------------------------------+
 double          g_capital;
-int             g_slPts;
-int             g_tpPts;
+double          g_slDist;
+double          g_tpDist;
 int             g_speed;
 bool            g_paused;
 VirtualPosition g_pos;
@@ -102,8 +102,8 @@ int OnInit()
 {
    g_capital    = StartCapital;
    g_riskPct    = RiskPercent;
-   g_slPts      = DefaultSLpts;
-   g_tpPts      = DefaultTPpts;
+   g_slDist     = DefaultSLprice;
+   g_tpDist     = DefaultTPprice;
    g_speed      = 1;
    g_paused     = false;
    g_flashEnd   = 0;
@@ -246,18 +246,14 @@ double CalcRiskUsd()
 }
 
 //+------------------------------------------------------------------+
-//| CalcLot — riskUsd / (slDistance * lotValue)                      |
+//| CalcLot — riskUsd / (slDist * lotValue)                          |
 //+------------------------------------------------------------------+
-double CalcLot(int slPts)
+double CalcLot(double slDist)
 {
-   double riskUsd    = g_capital * g_riskPct / 100.0;
-   double slDistance = slPts * g_point * 100.0;  // distância em preço (1 pt índice = 100 × g_point)
-   // Valor por lote por unidade de preço = contractSize * tickValue / tickSize
-   double lotValue   = g_contractSz * g_tickVal / g_tickSz;
-   if(lotValue <= 0) lotValue = 100.0;  // fallback NAS100 Fusion: $100/lote/ponto
-   double lot = riskUsd / (slDistance * lotValue);
-   PrintFormat("[CalcLot] riskUsd=%.2f slDist=%.4f lotValue=%.2f lot=%.4f",
-               riskUsd, slDistance, lotValue, lot);
+   double riskUsd  = g_capital * g_riskPct / 100.0;
+   double lotValue = g_contractSz * g_tickVal / g_tickSz;
+   if(lotValue <= 0) lotValue = 100.0;
+   double lot = riskUsd / (slDist * lotValue);
    return NormalizeDouble(MathMax(lot, 0.01), 2);
 }
 
@@ -281,20 +277,20 @@ void UpdateMaeMfe(const MqlTick &t)
    double fav, adv;
    if(g_pos.direction == "LONG")
    {
-      fav = (t.bid - g_pos.entryPrice) / g_point;
-      adv = (g_pos.entryPrice - t.bid) / g_point;
+      fav = t.bid - g_pos.entryPrice;
+      adv = g_pos.entryPrice - t.bid;
    }
    else
    {
-      fav = (g_pos.entryPrice - t.ask) / g_point;
-      adv = (t.ask - g_pos.entryPrice) / g_point;
+      fav = g_pos.entryPrice - t.ask;
+      adv = t.ask - g_pos.entryPrice;
    }
    if(fav > g_pos.mfePts) g_pos.mfePts = fav;
    if(adv > g_pos.maePts) g_pos.maePts = adv;
 
    // hit1R–hit5R
    for(int r=1; r<=5; r++)
-      if(!g_pos.hit[r] && g_pos.mfePts >= r * g_pos.slPoints)
+      if(!g_pos.hit[r] && g_pos.mfePts >= r * g_pos.slDist)
          g_pos.hit[r] = true;
 }
 
@@ -326,18 +322,18 @@ void OpenPosition(string direction)
    g_pos.direction     = direction;
    g_pos.entryTime     = t.time;
    g_pos.entryPrice    = (direction == "LONG") ? t.ask : t.bid;
-   g_pos.slPoints      = g_slPts;
-   g_pos.tpPoints      = g_tpPts;
-   g_pos.lotSize       = CalcLot(g_slPts);
+   g_pos.slDist        = g_slDist;
+   g_pos.tpDist        = g_tpDist;
+   g_pos.lotSize       = CalcLot(g_slDist);
    g_pos.riskUsd       = CalcRiskUsd();
    g_pos.capitalAtEntry= g_capital;
    g_pos.mfePts        = 0;
    g_pos.maePts        = 0;
    ArrayInitialize(g_pos.hit, false);
 
-   double entry = g_pos.entryPrice;
-   double slDist = g_slPts * g_point * 100.0;
-   double tpDist = g_tpPts * g_point * 100.0;
+   double entry  = g_pos.entryPrice;
+   double slDist = g_slDist;
+   double tpDist = g_tpDist;
 
    g_pos.slPrice = (direction == "LONG") ? entry - slDist : entry + slDist;
    g_pos.tpPrice = (direction == "LONG") ? entry + tpDist : entry - tpDist;
@@ -393,9 +389,9 @@ void HandleSLDrag()
    double newSL = ObjectGetDouble(0, SL_LINE, OBJPROP_PRICE);
    if(newSL <= 0) return;
 
-   g_pos.slPrice  = newSL;
-   g_pos.slPoints = (int)MathRound(MathAbs(newSL - g_pos.entryPrice) / g_point);
-   g_slPts        = g_pos.slPoints;
+   g_pos.slPrice = newSL;
+   g_pos.slDist  = MathAbs(newSL - g_pos.entryPrice);
+   g_slDist      = g_pos.slDist;
 
    PanelUpdate();
 }
@@ -510,8 +506,8 @@ string BuildJson(double exitPrice, string reason, datetime exitTime,
       "\"hit4R\":"      + BoolStr(g_pos.hit[4]) + ","
       "\"hit5R\":"      + BoolStr(g_pos.hit[5]) + ","
       "\"lotSize\":"    + DoubleToString(g_pos.lotSize, 2) + ","
-      "\"slPoints\":"   + IntegerToString(g_pos.slPoints) + ","
-      "\"tpPoints\":"   + IntegerToString(g_pos.tpPoints) + ","
+      "\"slDist\":"     + DoubleToString(g_pos.slDist, 2) + ","
+      "\"tpDist\":"     + DoubleToString(g_pos.tpDist, 2) + ","
       "\"capitalInicial\":" + DoubleToString(g_pos.capitalAtEntry, 2) + ","
       "\"riskPct\":"    + DoubleToString(g_riskPct, 1) + ","
       "\"pnlNet\":"     + DoubleToString(pnlNet, 2) + ","
@@ -574,20 +570,20 @@ void ComputePostExitMaeMfe(datetime exitTime)
       double fav, adv;
       if(g_pos.direction == "LONG")
       {
-         fav = (postTicks[i].bid - g_pos.entryPrice) / g_point;
-         adv = (g_pos.entryPrice - postTicks[i].bid) / g_point;
+         fav = postTicks[i].bid - g_pos.entryPrice;
+         adv = g_pos.entryPrice - postTicks[i].bid;
       }
       else
       {
-         fav = (g_pos.entryPrice - postTicks[i].ask) / g_point;
-         adv = (postTicks[i].ask - g_pos.entryPrice) / g_point;
+         fav = g_pos.entryPrice - postTicks[i].ask;
+         adv = postTicks[i].ask - g_pos.entryPrice;
       }
 
       if(fav > g_pos.mfePts) g_pos.mfePts = fav;
       if(adv > g_pos.maePts) g_pos.maePts = adv;
 
       for(int r = 1; r <= 5; r++)
-         if(!g_pos.hit[r] && g_pos.mfePts >= r * g_pos.slPoints)
+         if(!g_pos.hit[r] && g_pos.mfePts >= r * g_pos.slDist)
             g_pos.hit[r] = true;
    }
 
@@ -729,10 +725,10 @@ void PanelCreate()
    CreateLabel(PRE "L_LOT_V",  x+90, y+54,  "0.00",          CLR_TEXT,  9);
 
    // --- Linha 3: SL | TP
-   CreateLabel(PRE "L_SL_T",   x+8,  y+74,  "SL (pts)",      CLR_MUTED, 8);
-   CreateLabel(PRE "L_SL_V",   x+8,  y+86,  "0",             CLR_TEXT,  9);
-   CreateLabel(PRE "L_TP_T",   x+90, y+74,  "TP (pts)",      CLR_MUTED, 8);
-   CreateLabel(PRE "L_TP_V",   x+90, y+86,  "0",             CLR_TEXT,  9);
+   CreateLabel(PRE "L_SL_T",   x+8,  y+74,  "SL (dist)",     CLR_MUTED, 8);
+   CreateLabel(PRE "L_SL_V",   x+8,  y+86,  "0.00",          CLR_TEXT,  9);
+   CreateLabel(PRE "L_TP_T",   x+90, y+74,  "TP (dist)",     CLR_MUTED, 8);
+   CreateLabel(PRE "L_TP_V",   x+90, y+86,  "0.00",          CLR_TEXT,  9);
 
    // --- Linha 4: PnL (só com posição)
    CreateLabel(PRE "L_PNL_T",  x+8,  y+106, "PnL",           CLR_MUTED, 8);
@@ -798,15 +794,16 @@ void PanelUpdate()
    // Capital
    SetLabel(PRE "L_CAP_V", StringFormat("$%.2f", g_capital));
 
-   // Risco e lote (usa slPts atual)
-   int   sl   = g_pos.isOpen ? g_pos.slPoints : g_slPts;
-   double lot  = CalcLot(sl);
+   // Risco e lote (usa slDist atual)
+   double sl  = g_pos.isOpen ? g_pos.slDist : g_slDist;
+   double tp  = g_pos.isOpen ? g_pos.tpDist : g_tpDist;
+   double lot = CalcLot(sl);
    SetLabel(PRE "L_RSK_V", StringFormat("%.1f%%", g_riskPct));
    SetLabel(PRE "L_LOT_V", StringFormat("%.2f", lot));
 
    // SL / TP
-   SetLabel(PRE "L_SL_V", IntegerToString(sl));
-   SetLabel(PRE "L_TP_V", IntegerToString(g_pos.isOpen ? g_pos.tpPoints : g_tpPts));
+   SetLabel(PRE "L_SL_V", StringFormat("%.2f", sl));
+   SetLabel(PRE "L_TP_V", StringFormat("%.2f", tp));
 
    // PnL flutuante
    if(g_pos.isOpen)
