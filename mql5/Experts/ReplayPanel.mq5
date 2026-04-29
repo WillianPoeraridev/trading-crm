@@ -117,16 +117,31 @@ int OnInit()
    EventSetTimer(1);
    ChartRedraw();
 
-   // Abre gráficos M5 e H1 do NAS100_SIM automaticamente
-   long chartM5 = ChartOpen(DestSymbol, PERIOD_M5);
-   if(chartM5 > 0)
-      ChartSetInteger(chartM5, CHART_SHOW_GRID, false);
+   // Abre M5 e H1 apenas se ainda não estiverem abertos
+   bool m5Open = false, h1Open = false;
+   long chartId = ChartFirst();
+   while(chartId >= 0)
+   {
+      if(ChartSymbol(chartId) == DestSymbol)
+      {
+         if(ChartPeriod(chartId) == PERIOD_M5) m5Open = true;
+         if(ChartPeriod(chartId) == PERIOD_H1) h1Open = true;
+      }
+      chartId = ChartNext(chartId);
+   }
 
-   long chartH1 = ChartOpen(DestSymbol, PERIOD_H1);
-   if(chartH1 > 0)
-      ChartSetInteger(chartH1, CHART_SHOW_GRID, false);
+   if(!m5Open)
+   {
+      long chartM5 = ChartOpen(DestSymbol, PERIOD_M5);
+      if(chartM5 > 0) ChartSetInteger(chartM5, CHART_SHOW_GRID, false);
+   }
+   if(!h1Open)
+   {
+      long chartH1 = ChartOpen(DestSymbol, PERIOD_H1);
+      if(chartH1 > 0) ChartSetInteger(chartH1, CHART_SHOW_GRID, false);
+   }
 
-   Print("[ReplayPanel] Gráficos M5 e H1 abertos automaticamente");
+   Print("[ReplayPanel] Gráficos M5 e H1 verificados/abertos");
    return INIT_SUCCEEDED;
 }
 
