@@ -46,7 +46,7 @@ input string   SourceSymbol  = "NAS100";
 #define PX  10
 #define PY  30
 #define PW  236
-#define PH  330
+#define PH  360
 
 //+------------------------------------------------------------------+
 //| Struct de posição virtual                                        |
@@ -251,7 +251,7 @@ double CalcRiskUsd()
 double CalcLot(int slPts)
 {
    double riskUsd    = g_capital * g_riskPct / 100.0;
-   double slDistance = slPts * g_point;  // distância em preço
+   double slDistance = slPts * g_point * 100.0;  // distância em preço (1 pt índice = 100 × g_point)
    // Valor por lote por unidade de preço = contractSize * tickValue / tickSize
    double lotValue   = g_contractSz * g_tickVal / g_tickSz;
    if(lotValue <= 0) lotValue = 100.0;  // fallback NAS100 Fusion: $100/lote/ponto
@@ -336,8 +336,8 @@ void OpenPosition(string direction)
    ArrayInitialize(g_pos.hit, false);
 
    double entry = g_pos.entryPrice;
-   double slDist = g_slPts * g_point;
-   double tpDist = g_tpPts * g_point;
+   double slDist = g_slPts * g_point * 100.0;
+   double tpDist = g_tpPts * g_point * 100.0;
 
    g_pos.slPrice = (direction == "LONG") ? entry - slDist : entry + slDist;
    g_pos.tpPrice = (direction == "LONG") ? entry + tpDist : entry - tpDist;
@@ -626,7 +626,7 @@ void CreateHLine(const string name, double price, color clr, const string lbl)
    ObjectDelete(0, name);
    ObjectCreate(0, name, OBJ_HLINE, 0, 0, price);
    ObjectSetInteger(0, name, OBJPROP_COLOR,      clr);
-   ObjectSetInteger(0, name, OBJPROP_STYLE,      STYLE_DASH);
+   ObjectSetInteger(0, name, OBJPROP_STYLE,      STYLE_DOT);
    ObjectSetInteger(0, name, OBJPROP_WIDTH,      1);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
    ObjectSetInteger(0, name, OBJPROP_BACK,       false);
@@ -738,44 +738,37 @@ void PanelCreate()
    CreateLabel(PRE "L_PNL_T",  x+8,  y+106, "PnL",           CLR_MUTED, 8);
    CreateLabel(PRE "L_PNL_V",  x+8,  y+118, "—",             CLR_TEXT,  9);
 
+   // --- Linha 5: Timer de próxima barra M15
+   CreateLabel(PRE "L_TIMER_T", x+8, y+138, "Próxima barra", CLR_MUTED, 8);
+   CreateLabel(PRE "L_TIMER_V", x+8, y+150, "00:00",         CLR_TEXT,  11);
+
    // Separador visual (faixa escura)
-   CreateRect(PRE "SEP1", x, y+140, PW, 2, CLR_BG2);
+   CreateRect(PRE "SEP1", x, y+168, PW, 2, CLR_BG2);
 
    // --- Botões BUY / SELL
-   CreateBtn(PRE "BUY",   x+6,   y+148, 108, 28, "▲  BUY",  CLR_BUY);
-   CreateBtn(PRE "SELL",  x+122, y+148, 108, 28, "▼  SELL", CLR_SELL);
+   CreateBtn(PRE "BUY",   x+6,   y+176, 108, 28, "▲  BUY",  CLR_BUY);
+   CreateBtn(PRE "SELL",  x+122, y+176, 108, 28, "▼  SELL", CLR_SELL);
 
    // --- Botão FECHAR
-   CreateBtn(PRE "CLOSE", x+6,   y+182, 224, 24, "FECHAR POSIÇÃO", CLR_CLOSE);
+   CreateBtn(PRE "CLOSE", x+6,   y+210, 224, 24, "FECHAR POSIÇÃO", CLR_CLOSE);
 
-   CreateRect(PRE "SEP2", x, y+212, PW, 2, CLR_BG2);
+   CreateRect(PRE "SEP2", x, y+240, PW, 2, CLR_BG2);
 
    // --- Velocidade: label + 4 botões
-   CreateLabel(PRE "L_SPD",    x+8,  y+218, "Velocidade",    CLR_MUTED, 8);
-   CreateBtn(PRE "SPD1",  x+6,   y+230, 50, 22, "1x",  CLR_SPD_ON);
-   CreateBtn(PRE "SPD2",  x+60,  y+230, 50, 22, "2x",  CLR_SPD_OFF);
-   CreateBtn(PRE "SPD4",  x+114, y+230, 50, 22, "4x",  CLR_SPD_OFF);
-   CreateBtn(PRE "SPD8",  x+168, y+230, 62, 22, "8x",  CLR_SPD_OFF);
+   CreateLabel(PRE "L_SPD",    x+8,  y+246, "Velocidade",    CLR_MUTED, 8);
+   CreateBtn(PRE "SPD1",  x+6,   y+258, 50, 22, "1x",  CLR_SPD_ON);
+   CreateBtn(PRE "SPD2",  x+60,  y+258, 50, 22, "2x",  CLR_SPD_OFF);
+   CreateBtn(PRE "SPD4",  x+114, y+258, 50, 22, "4x",  CLR_SPD_OFF);
+   CreateBtn(PRE "SPD8",  x+168, y+258, 62, 22, "8x",  CLR_SPD_OFF);
 
-   CreateRect(PRE "SEP3", x, y+258, PW, 2, CLR_BG2);
+   CreateRect(PRE "SEP3", x, y+286, PW, 2, CLR_BG2);
 
    // --- Botão PAUSE/PLAY
-   CreateBtn(PRE "PAUSE", x+6,  y+266, 224, 28, "❚❚  PAUSAR",  CLR_PAUSE);
+   CreateBtn(PRE "PAUSE", x+6,  y+294, 224, 28, "❚❚  PAUSAR",  CLR_PAUSE);
 
    // --- Rodapé: símbolo
-   CreateLabel(PRE "L_SYM", x+8, y+304, DestSymbol, CLR_MUTED, 8);
+   CreateLabel(PRE "L_SYM", x+8, y+332, DestSymbol, CLR_MUTED, 8);
 
-   // --- Timer de próxima barra M15 (canto inferior direito)
-   ObjectDelete(0, PRE "L_TIMER");
-   ObjectCreate(0, PRE "L_TIMER", OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_XDISTANCE,  10);
-   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_YDISTANCE,  20);
-   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_CORNER,     CORNER_RIGHT_LOWER);
-   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_COLOR,      clrWhite);
-   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_FONTSIZE,   9);
-   ObjectSetString (0, PRE "L_TIMER", OBJPROP_FONT,       "Courier New");
-   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_BACK,       false);
-   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_SELECTABLE, false);
 }
 
 //+------------------------------------------------------------------+
@@ -790,7 +783,7 @@ void PanelDelete()
       PRE "SEP1", PRE "SEP2", PRE "SEP3",
       PRE "BUY", PRE "SELL", PRE "CLOSE", PRE "PAUSE",
       PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8",
-      PRE "L_SPD", PRE "L_SYM", PRE "L_TIMER",
+      PRE "L_SPD", PRE "L_SYM", PRE "L_TIMER_T", PRE "L_TIMER_V",
       PRE "RISK_UP", PRE "RISK_DN"
    };
    for(int i = 0; i < ArraySize(panelObjs); i++)
@@ -851,15 +844,11 @@ void PanelUpdate()
    MqlTick tNow;
    if(SymbolInfoTick(DestSymbol, tNow))
    {
-      datetime barOpen  = (datetime)((long)tNow.time / 900) * 900;
+      datetime barOpen  = (datetime)((long)tNow.time / 900 * 900);
       datetime barClose = barOpen + 900;
       int secsLeft      = (int)(barClose - tNow.time);
-      int mm = secsLeft / 60;
-      int ss = secsLeft % 60;
-      string timerStr = StringFormat("Spread: %d   Next Bar in 0-%d:%02d",
-                                     (int)SymbolInfoInteger(DestSymbol, SYMBOL_SPREAD),
-                                     mm, ss);
-      ObjectSetString(0, PRE "L_TIMER", OBJPROP_TEXT, timerStr);
+      if(secsLeft < 0) secsLeft = 0;
+      SetLabel(PRE "L_TIMER_V", StringFormat("%02d:%02d", secsLeft/60, secsLeft%60));
    }
 
    ChartRedraw();
