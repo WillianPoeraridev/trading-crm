@@ -246,15 +246,18 @@ double CalcRiskUsd()
 }
 
 //+------------------------------------------------------------------+
-//| CalcLot — riskUsd / (slPts * pointValue)                         |
+//| CalcLot — riskUsd / (slDistance * lotValue)                      |
 //+------------------------------------------------------------------+
 double CalcLot(int slPts)
 {
-   double riskUsd = CalcRiskUsd();
-   // NAS100 Fusion: valor por ponto = contractSize * tickValue / tickSize
-   double pointValue = g_contractSz * g_tickVal / g_tickSz;
-   if(pointValue <= 0) pointValue = 1.0; // fallback: $1 por ponto
-   double lot = riskUsd / (slPts * pointValue);
+   double riskUsd    = g_capital * g_riskPct / 100.0;
+   double slDistance = slPts * g_point;  // distância em preço
+   // Valor por lote por unidade de preço = contractSize * tickValue / tickSize
+   double lotValue   = g_contractSz * g_tickVal / g_tickSz;
+   if(lotValue <= 0) lotValue = 100.0;  // fallback NAS100 Fusion: $100/lote/ponto
+   double lot = riskUsd / (slDistance * lotValue);
+   PrintFormat("[CalcLot] riskUsd=%.2f slDist=%.4f lotValue=%.2f lot=%.4f",
+               riskUsd, slDistance, lotValue, lot);
    return NormalizeDouble(MathMax(lot, 0.01), 2);
 }
 
@@ -761,14 +764,37 @@ void PanelCreate()
 
    // --- Rodapé: símbolo
    CreateLabel(PRE "L_SYM", x+8, y+304, DestSymbol, CLR_MUTED, 8);
+
+   // --- Timer de próxima barra M15 (canto inferior direito)
+   ObjectDelete(0, PRE "L_TIMER");
+   ObjectCreate(0, PRE "L_TIMER", OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_XDISTANCE,  10);
+   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_YDISTANCE,  20);
+   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_CORNER,     CORNER_RIGHT_LOWER);
+   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_COLOR,      clrWhite);
+   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_FONTSIZE,   9);
+   ObjectSetString (0, PRE "L_TIMER", OBJPROP_FONT,       "Courier New");
+   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_BACK,       false);
+   ObjectSetInteger(0, PRE "L_TIMER", OBJPROP_SELECTABLE, false);
 }
 
 //+------------------------------------------------------------------+
-//| PanelDelete                                                      |
+//| PanelDelete — preserva linhas SL/TP/Entry                        |
 //+------------------------------------------------------------------+
 void PanelDelete()
 {
-   ObjectsDeleteAll(0, PRE);
+   string panelObjs[] = {
+      PRE "BG", PRE "L_CAP_T", PRE "L_CAP_V", PRE "L_RSK_T", PRE "L_RSK_V",
+      PRE "L_LOT_T", PRE "L_LOT_V", PRE "L_SL_T", PRE "L_SL_V",
+      PRE "L_TP_T", PRE "L_TP_V", PRE "L_PNL_T", PRE "L_PNL_V",
+      PRE "SEP1", PRE "SEP2", PRE "SEP3",
+      PRE "BUY", PRE "SELL", PRE "CLOSE", PRE "PAUSE",
+      PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8",
+      PRE "L_SPD", PRE "L_SYM", PRE "L_TIMER",
+      PRE "RISK_UP", PRE "RISK_DN"
+   };
+   for(int i = 0; i < ArraySize(panelObjs); i++)
+      ObjectDelete(0, panelObjs[i]);
 }
 
 //+------------------------------------------------------------------+
@@ -820,6 +846,21 @@ void PanelUpdate()
    // Pause/Play
    ObjectSetString (0, PRE "PAUSE", OBJPROP_TEXT,    g_paused ? "▶  RETOMAR" : "❚❚  PAUSAR");
    ObjectSetInteger(0, PRE "PAUSE", OBJPROP_BGCOLOR, g_paused ? CLR_SPD_ON  : CLR_PAUSE);
+
+   // Timer de próxima barra M15
+   MqlTick tNow;
+   if(SymbolInfoTick(DestSymbol, tNow))
+   {
+      datetime barOpen  = (datetime)((long)tNow.time / 900) * 900;
+      datetime barClose = barOpen + 900;
+      int secsLeft      = (int)(barClose - tNow.time);
+      int mm = secsLeft / 60;
+      int ss = secsLeft % 60;
+      string timerStr = StringFormat("Spread: %d   Next Bar in 0-%d:%02d",
+                                     (int)SymbolInfoInteger(DestSymbol, SYMBOL_SPREAD),
+                                     mm, ss);
+      ObjectSetString(0, PRE "L_TIMER", OBJPROP_TEXT, timerStr);
+   }
 
    ChartRedraw();
 }
