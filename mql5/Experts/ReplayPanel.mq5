@@ -87,6 +87,9 @@ double          g_tickSz;
 double          g_contractSz;
 double          g_point;
 
+// Risco ajustável em tempo real (inicializado a partir do input RiskPercent)
+double          g_riskPct;
+
 // Nomes das linhas horizontais
 const string SL_LINE = PRE "SL";
 const string TP_LINE = PRE "TP";
@@ -98,6 +101,7 @@ const string EN_LINE = PRE "Entry";
 int OnInit()
 {
    g_capital    = StartCapital;
+   g_riskPct    = RiskPercent;
    g_slPts      = DefaultSLpts;
    g_tpPts      = DefaultTPpts;
    g_speed      = 1;
@@ -238,20 +242,20 @@ void RefreshSymbolInfo()
 //+------------------------------------------------------------------+
 double CalcRiskUsd()
 {
-   return g_capital * RiskPercent / 100.0;
+   return g_capital * g_riskPct / 100.0;
 }
 
 //+------------------------------------------------------------------+
-//| CalcLot — riskUsd / (slPts * tickValue / tickSize)               |
+//| CalcLot — riskUsd / (slPts * pointValue)                         |
 //+------------------------------------------------------------------+
 double CalcLot(int slPts)
 {
    double riskUsd = CalcRiskUsd();
-   double denom   = slPts * g_tickVal / g_tickSz;
-   if(denom <= 0) return 0.01;
-   double lot = riskUsd / denom;
-   // arredonda para 2 casas (virtual)
-   return NormalizeDouble(lot, 2);
+   // NAS100 Fusion: valor por ponto = contractSize * tickValue / tickSize
+   double pointValue = g_contractSz * g_tickVal / g_tickSz;
+   if(pointValue <= 0) pointValue = 1.0; // fallback: $1 por ponto
+   double lot = riskUsd / (slPts * pointValue);
+   return NormalizeDouble(MathMax(lot, 0.01), 2);
 }
 
 //+------------------------------------------------------------------+
@@ -401,6 +405,9 @@ void HandleButtonClick(const string name)
    // reset estado do botão (evita ficar pressionado visualmente)
    ObjectSetInteger(0, name, OBJPROP_STATE, false);
 
+   if(name == PRE "RISK_UP") { g_riskPct = MathMin(g_riskPct + 1.0, 50.0); PanelUpdate(); return; }
+   if(name == PRE "RISK_DN") { g_riskPct = MathMax(g_riskPct - 1.0,  1.0); PanelUpdate(); return; }
+
    if(name == PRE "BUY")       { if(!g_pos.isOpen) OpenPosition("LONG");  return; }
    if(name == PRE "SELL")      { if(!g_pos.isOpen) OpenPosition("SHORT"); return; }
    if(name == PRE "CLOSE")
@@ -503,7 +510,7 @@ string BuildJson(double exitPrice, string reason, datetime exitTime,
       "\"slPoints\":"   + IntegerToString(g_pos.slPoints) + ","
       "\"tpPoints\":"   + IntegerToString(g_pos.tpPoints) + ","
       "\"capitalInicial\":" + DoubleToString(g_pos.capitalAtEntry, 2) + ","
-      "\"riskPct\":"    + DoubleToString(RiskPercent, 1) + ","
+      "\"riskPct\":"    + DoubleToString(g_riskPct, 1) + ","
       "\"pnlNet\":"     + DoubleToString(pnlNet, 2) + ","
       "\"durationMin\":" + IntegerToString(durationMin) + ","
       "\"rrAchieved\":"  + DoubleToString(resultR, 4) +
@@ -710,9 +717,11 @@ void PanelCreate()
    CreateLabel(PRE "L_CAP_T",  x+8,  y+8,   "Capital",       CLR_MUTED, 8);
    CreateLabel(PRE "L_CAP_V",  x+8,  y+20,  "$0.00",         CLR_TEXT,  11);
 
-   // --- Linha 2: Risco | Lote
+   // --- Linha 2: Risco (+/-) | Lote
    CreateLabel(PRE "L_RSK_T",  x+8,  y+42,  "Risco",         CLR_MUTED, 8);
    CreateLabel(PRE "L_RSK_V",  x+8,  y+54,  "0.0%",          CLR_TEXT,  9);
+   CreateBtn(PRE "RISK_DN",    x+52, y+51,  18, 16, "-",     CLR_BG2);
+   CreateBtn(PRE "RISK_UP",    x+72, y+51,  18, 16, "+",     CLR_BG2);
    CreateLabel(PRE "L_LOT_T",  x+90, y+42,  "Lote",          CLR_MUTED, 8);
    CreateLabel(PRE "L_LOT_V",  x+90, y+54,  "0.00",          CLR_TEXT,  9);
 
@@ -773,7 +782,7 @@ void PanelUpdate()
    // Risco e lote (usa slPts atual)
    int   sl   = g_pos.isOpen ? g_pos.slPoints : g_slPts;
    double lot  = CalcLot(sl);
-   SetLabel(PRE "L_RSK_V", StringFormat("%.1f%%", RiskPercent));
+   SetLabel(PRE "L_RSK_V", StringFormat("%.1f%%", g_riskPct));
    SetLabel(PRE "L_LOT_V", StringFormat("%.2f", lot));
 
    // SL / TP
