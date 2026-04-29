@@ -180,6 +180,11 @@ void OnChartEvent(const int id,
 
    else if(id == CHARTEVENT_CHART_CHANGE)
    {
+      if(ChartPeriod(0) != PERIOD_M15)
+      {
+         ChartSetSymbolPeriod(0, DestSymbol, PERIOD_M15);
+         Print("[ReplayPanel] Timeframe travado em M15 — use janelas separadas para M5 e H1");
+      }
       PanelDelete();
       PanelCreate();
       PanelUpdate();
