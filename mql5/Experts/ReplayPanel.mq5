@@ -90,6 +90,8 @@ double          g_point;
 // Risco ajustável em tempo real (inicializado a partir do input RiskPercent)
 double          g_riskPct;
 
+int             g_timerCount = 0;
+
 // Nomes das linhas horizontais
 const string SL_LINE = PRE "SL";
 const string TP_LINE = PRE "TP";
@@ -159,6 +161,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, SL_LINE);
    ObjectDelete(0, TP_LINE);
    ObjectDelete(0, EN_LINE);
+   RemoveLinesFromOtherCharts();
    ChartRedraw();
 }
 
@@ -186,12 +189,17 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
 {
+   g_timerCount++;
+
    if(g_flashEnd != 0 && TimeCurrent() >= g_flashEnd)
    {
       g_flashEnd = 0;
       ObjectSetInteger(0, PRE "BG", OBJPROP_BGCOLOR, CLR_BG);
       ChartRedraw();
    }
+
+   if(g_timerCount % 2 == 0)
+      SyncManualObjects();
 }
 
 //+------------------------------------------------------------------+
@@ -207,6 +215,9 @@ void OnChartEvent(const int id,
 
    else if(id == CHARTEVENT_OBJECT_DRAG && sparam == SL_LINE)
       HandleSLDrag();
+
+   else if(id == CHARTEVENT_OBJECT_DRAG && sparam == TP_LINE)
+      HandleTPDrag();
 
    else if(id == CHARTEVENT_CHART_CHANGE)
    {
@@ -339,6 +350,7 @@ void OpenPosition(string direction)
    g_pos.tpPrice = (direction == "LONG") ? entry + tpDist : entry - tpDist;
 
    DrawLines(entry, g_pos.slPrice, g_pos.tpPrice);
+   SyncLinesToOtherCharts();
    TakeScreenshot("open_" + direction + "_" + IntegerToString((int)t.time));
    PanelUpdate();
    ChartRedraw();
@@ -372,6 +384,7 @@ void ClosePosition(double exitPrice, string reason, const MqlTick &t)
    ObjectDelete(0, SL_LINE);
    ObjectDelete(0, TP_LINE);
    ObjectDelete(0, EN_LINE);
+   RemoveLinesFromOtherCharts();
 
    g_pos.isOpen = false;
    PanelUpdate();
@@ -393,6 +406,23 @@ void HandleSLDrag()
    g_pos.slDist  = MathAbs(newSL - g_pos.entryPrice);
    g_slDist      = g_pos.slDist;
 
+   SyncLinesToOtherCharts();
+   PanelUpdate();
+}
+
+//+------------------------------------------------------------------+
+//| HandleTPDrag — TP line foi arrastada pelo usuário                |
+//+------------------------------------------------------------------+
+void HandleTPDrag()
+{
+   double newTP = ObjectGetDouble(0, TP_LINE, OBJPROP_PRICE);
+   if(newTP <= 0) return;
+
+   g_pos.tpPrice = newTP;
+   g_pos.tpDist  = MathAbs(newTP - g_pos.entryPrice);
+   g_tpDist      = g_pos.tpDist;
+
+   SyncLinesToOtherCharts();
    PanelUpdate();
 }
 
@@ -700,6 +730,119 @@ void SetLabel(const string name, const string text, color clr = CLR_TEXT)
 void SetBtnBg(const string name, color clr)
 {
    ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clr);
+}
+
+//+------------------------------------------------------------------+
+//| SyncLinesToOtherCharts — replica EN/SL/TP nos gráficos M5 e H1  |
+//+------------------------------------------------------------------+
+void SyncLinesToOtherCharts()
+{
+   if(!g_pos.isOpen) return;
+   long currentChart = ChartID();
+   long chartId = ChartFirst();
+   while(chartId >= 0)
+   {
+      if(chartId != currentChart && ChartSymbol(chartId) == DestSymbol)
+      {
+         string lines[]  = { EN_LINE, SL_LINE, TP_LINE };
+         color  colors[] = { clrDodgerBlue, clrRed, clrLime };
+         string labels[] = { "Entrada", "SL", "TP" };
+         double prices[] = { g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice };
+
+         for(int i = 0; i < 3; i++)
+         {
+            ObjectDelete(chartId, lines[i]);
+            ObjectCreate(chartId, lines[i], OBJ_HLINE, 0, 0, prices[i]);
+            ObjectSetInteger(chartId, lines[i], OBJPROP_COLOR,      colors[i]);
+            ObjectSetInteger(chartId, lines[i], OBJPROP_STYLE,      STYLE_DOT);
+            ObjectSetInteger(chartId, lines[i], OBJPROP_WIDTH,      1);
+            ObjectSetString (chartId, lines[i], OBJPROP_TEXT,       labels[i]);
+            ObjectSetInteger(chartId, lines[i], OBJPROP_SELECTABLE, false);
+         }
+         ChartRedraw(chartId);
+      }
+      chartId = ChartNext(chartId);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| RemoveLinesFromOtherCharts — limpa EN/SL/TP dos outros gráficos  |
+//+------------------------------------------------------------------+
+void RemoveLinesFromOtherCharts()
+{
+   long currentChart = ChartID();
+   long chartId = ChartFirst();
+   while(chartId >= 0)
+   {
+      if(chartId != currentChart && ChartSymbol(chartId) == DestSymbol)
+      {
+         ObjectDelete(chartId, EN_LINE);
+         ObjectDelete(chartId, SL_LINE);
+         ObjectDelete(chartId, TP_LINE);
+         ChartRedraw(chartId);
+      }
+      chartId = ChartNext(chartId);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| SyncManualObjects — replica objetos manuais do M15 nos outros    |
+//+------------------------------------------------------------------+
+void SyncManualObjects()
+{
+   long currentChart = ChartID();
+   int total = ObjectsTotal(currentChart, 0);
+
+   for(int i = 0; i < total; i++)
+   {
+      string name = ObjectName(currentChart, i, 0);
+      if(StringFind(name, PRE) == 0) continue;
+      if(name == EN_LINE || name == SL_LINE || name == TP_LINE) continue;
+
+      int      type  = (int)ObjectGetInteger(currentChart, name, OBJPROP_TYPE);
+      datetime t1    = (datetime)ObjectGetInteger(currentChart, name, OBJPROP_TIME,  0);
+      double   p1    = ObjectGetDouble(currentChart, name, OBJPROP_PRICE, 0);
+      datetime t2    = (datetime)ObjectGetInteger(currentChart, name, OBJPROP_TIME,  1);
+      double   p2    = ObjectGetDouble(currentChart, name, OBJPROP_PRICE, 1);
+      color    clr   = (color)ObjectGetInteger(currentChart, name, OBJPROP_COLOR);
+      int      style = (int)ObjectGetInteger(currentChart, name, OBJPROP_STYLE);
+      int      width = (int)ObjectGetInteger(currentChart, name, OBJPROP_WIDTH);
+
+      long chartId = ChartFirst();
+      while(chartId >= 0)
+      {
+         if(chartId != currentChart && ChartSymbol(chartId) == DestSymbol)
+         {
+            if(ObjectFind(chartId, name) < 0)
+               ObjectCreate(chartId, name, type, 0, t1, p1, t2, p2);
+            ObjectSetInteger(chartId, name, OBJPROP_COLOR, clr);
+            ObjectSetInteger(chartId, name, OBJPROP_STYLE, style);
+            ObjectSetInteger(chartId, name, OBJPROP_WIDTH, width);
+            ChartRedraw(chartId);
+         }
+         chartId = ChartNext(chartId);
+      }
+   }
+
+   // Remove objetos que foram deletados no M15
+   long chartId = ChartFirst();
+   while(chartId >= 0)
+   {
+      if(chartId != currentChart && ChartSymbol(chartId) == DestSymbol)
+      {
+         int otherTotal = ObjectsTotal(chartId, 0);
+         for(int j = otherTotal - 1; j >= 0; j--)
+         {
+            string oName = ObjectName(chartId, j, 0);
+            if(StringFind(oName, PRE) == 0) continue;
+            if(oName == EN_LINE || oName == SL_LINE || oName == TP_LINE) continue;
+            if(ObjectFind(currentChart, oName) < 0)
+               ObjectDelete(chartId, oName);
+         }
+         ChartRedraw(chartId);
+      }
+      chartId = ChartNext(chartId);
+   }
 }
 
 //+------------------------------------------------------------------+
