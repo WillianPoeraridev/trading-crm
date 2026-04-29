@@ -60,6 +60,12 @@ void OnStart()
 
    LoadHistoricalBars();
 
+   // Limpa ticks do período do replay para evitar conflito de ordem com CustomRatesUpdate
+   datetime cleanFrom = g_startTime - 60;
+   datetime cleanTo   = g_startTime + 86400;
+   CustomTicksDelete(DestSymbol, (long)cleanFrom * 1000, (long)cleanTo * 1000);
+   Print("[ReplayEngine] Ticks do período de replay limpos — iniciando injeção");
+
    if(!LoadTicks(g_startTime))
    {
       PrintFormat("[ReplayEngine] Falha ao carregar ticks de %s", SourceSymbol);
