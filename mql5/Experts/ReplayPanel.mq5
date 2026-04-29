@@ -12,14 +12,14 @@
 //+------------------------------------------------------------------+
 //| Inputs                                                           |
 //+------------------------------------------------------------------+
-input string   ApiUrl        = "https://seu-dominio.vercel.app/api/trades";
-input string   ApiKey        = "";
+input string   ApiUrl        = "https://trading-crm-main.vercel.app/api/trades";
+input string   ApiKey        = "nas100-sim-2026";
 input double   StartCapital  = 600.0;
 input double   RiskPercent   = 14.0;
 input int      DefaultSLpts  = 400;
 input int      DefaultTPpts  = 800;
 input string   DestSymbol    = "NAS100_SIM";
-input string   SourceSymbol  = "US100";
+input string   SourceSymbol  = "NAS100";
 
 //+------------------------------------------------------------------+
 //| Constantes                                                       |
