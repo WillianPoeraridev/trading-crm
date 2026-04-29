@@ -8,7 +8,7 @@
 #property description "Replay de ticks históricos do NAS100 em símbolo custom NAS100_SIM"
 
 //--- Inputs configuráveis
-input string   SourceSymbol      = "US100";       // símbolo de origem (Fusion Markets)
+input string   SourceSymbol      = "NAS100";      // símbolo de origem (Fusion Markets)
 input string   DestSymbol        = "NAS100_SIM";  // símbolo custom de destino
 input datetime SessionDate       = 0;             // data do replay (0 = hoje)
 input int      OpeningHour       = 16;            // 16 (padrão) ou 15 (horário verão US)
