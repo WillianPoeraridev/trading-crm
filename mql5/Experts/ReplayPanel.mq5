@@ -814,7 +814,7 @@ void SyncManualObjects()
          if(chartId != currentChart && ChartSymbol(chartId) == DestSymbol)
          {
             if(ObjectFind(chartId, name) < 0)
-               ObjectCreate(chartId, name, type, 0, t1, p1, t2, p2);
+               ObjectCreate(chartId, name, (ENUM_OBJECT)type, 0, t1, p1, t2, p2);
             ObjectSetInteger(chartId, name, OBJPROP_COLOR, clr);
             ObjectSetInteger(chartId, name, OBJPROP_STYLE, style);
             ObjectSetInteger(chartId, name, OBJPROP_WIDTH, width);
