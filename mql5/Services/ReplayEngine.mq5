@@ -77,6 +77,21 @@ void OnStart()
 
    PrintFormat("[ReplayEngine] %d ticks carregados. Iniciando loop de replay (speed=%dx, paused=false)", g_total, g_speed);
 
+   // Navega todos os gráficos do DestSymbol para o ponto de início do replay
+   Sleep(2000);
+   long chartId = ChartFirst();
+   while(chartId >= 0)
+   {
+      if(ChartSymbol(chartId) == DestSymbol)
+      {
+         datetime now = TimeCurrent();
+         int barsOffset = (int)((now - g_startTime) / 900); // barras M15 entre startTime e agora
+         ChartNavigate(chartId, CHART_END, barsOffset);
+         ChartRedraw(chartId);
+      }
+      chartId = ChartNext(chartId);
+   }
+
    ReplayLoop();
 
    WriteStatus("FINISHED");
