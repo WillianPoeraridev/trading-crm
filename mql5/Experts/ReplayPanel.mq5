@@ -148,6 +148,21 @@ int OnInit()
    }
 
    Print("[ReplayPanel] Gráficos M5 e H1 verificados/abertos");
+
+   // Aguarda o ReplayEngine carregar e navega para o início do replay
+   Sleep(1000);
+   long navId = ChartFirst();
+   while(navId >= 0)
+   {
+      if(ChartSymbol(navId) == DestSymbol)
+      {
+         ChartSetInteger(navId, CHART_AUTOSCROLL, true);
+         ChartNavigate(navId, CHART_END, 0);
+         ChartRedraw(navId);
+      }
+      navId = ChartNext(navId);
+   }
+
    return INIT_SUCCEEDED;
 }
 

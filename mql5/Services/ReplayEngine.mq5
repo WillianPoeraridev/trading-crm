@@ -77,22 +77,6 @@ void OnStart()
 
    PrintFormat("[ReplayEngine] %d ticks carregados. Iniciando loop de replay (speed=%dx, paused=false)", g_total, g_speed);
 
-   // Navega para o início do replay — simples e direto
-   Sleep(2000); // aguarda gráfico renderizar as barras históricas
-   long chartId = ChartFirst();
-   while(chartId >= 0)
-   {
-      if(ChartSymbol(chartId) == DestSymbol)
-      {
-         // Neste momento as barras históricas já estão no gráfico
-         // e o replay mal começou — CHART_END coloca exatamente no início do replay
-         ChartSetInteger(chartId, CHART_AUTOSCROLL, true);
-         ChartNavigate(chartId, CHART_END, 0);
-         ChartRedraw(chartId);
-      }
-      chartId = ChartNext(chartId);
-   }
-
    ReplayLoop();
 
    WriteStatus("FINISHED");
