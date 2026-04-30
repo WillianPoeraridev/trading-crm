@@ -143,38 +143,21 @@ bool LoadHistoricalBars()
    MqlRates rates[];
    ArraySetAsSeries(rates, false);
 
-   int copied = CopyRates(SourceSymbol, PERIOD_M1, 0, 43200, rates); // 30d * 24h * 60min
+   datetime from = g_startTime - (30 * 86400); // 30 dias antes do replay
+   datetime to   = g_startTime;                 // até o momento exato do início
+
+   int copied = CopyRates(SourceSymbol, PERIOD_M1, from, to, rates);
    if(copied <= 0)
    {
       PrintFormat("[ReplayEngine] CopyRates falhou (copied=%d, erro=%d)", copied, GetLastError());
       return false;
    }
 
-   ulong startMs = (ulong)g_startTime * 1000UL;
-   int cutIdx = copied;
-   for(int i = 0; i < copied; i++)
-   {
-      if((ulong)rates[i].time * 1000UL >= startMs)
-      {
-         cutIdx = i;
-         break;
-      }
-   }
-
-   if(cutIdx <= 0)
-   {
-      Print("[ReplayEngine] Nenhuma barra histórica anterior ao início do replay");
-      return true;
-   }
-
-   MqlRates historical[];
-   ArrayCopy(historical, rates, 0, 0, cutIdx);
-
-   int added = CustomRatesUpdate(DestSymbol, historical);
+   int added = CustomRatesUpdate(DestSymbol, rates);
    PrintFormat("[ReplayEngine] %d barras M1 históricas carregadas no %s (de %s até %s)",
                added, DestSymbol,
-               TimeToString(historical[0].time, TIME_DATE|TIME_MINUTES),
-               TimeToString(historical[cutIdx-1].time, TIME_DATE|TIME_MINUTES));
+               TimeToString(rates[0].time, TIME_DATE|TIME_MINUTES),
+               TimeToString(rates[copied-1].time, TIME_DATE|TIME_MINUTES));
    return added > 0;
 }
 
