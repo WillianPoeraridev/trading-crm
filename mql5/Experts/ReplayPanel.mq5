@@ -92,6 +92,7 @@ double          g_riskPct;
 
 int             g_timerCount = 0;
 bool            g_navigated  = false;
+bool            g_scalefixed = false;
 
 // Nomes das linhas horizontais
 const string SL_LINE = PRE "SL";
@@ -177,8 +178,9 @@ void OnTick()
    if(!SymbolInfoTick(DestSymbol, t)) return;
 
    // Remove SCALEFIX no primeiro tick real — volta ao autoscale normal
-   if(g_navigated)
+   if(g_navigated && !g_scalefixed)
    {
+      g_scalefixed = true;
       long chartId = ChartFirst();
       while(chartId >= 0)
       {
@@ -186,7 +188,6 @@ void OnTick()
             ChartSetInteger(chartId, CHART_SCALEFIX, false);
          chartId = ChartNext(chartId);
       }
-      g_navigated = false;
    }
 
    if(g_pos.isOpen)
