@@ -176,6 +176,19 @@ void OnTick()
    MqlTick t;
    if(!SymbolInfoTick(DestSymbol, t)) return;
 
+   // Remove SCALEFIX no primeiro tick real — volta ao autoscale normal
+   if(g_navigated)
+   {
+      long chartId = ChartFirst();
+      while(chartId >= 0)
+      {
+         if(ChartSymbol(chartId) == DestSymbol)
+            ChartSetInteger(chartId, CHART_SCALEFIX, false);
+         chartId = ChartNext(chartId);
+      }
+      g_navigated = false;
+   }
+
    if(g_pos.isOpen)
    {
       UpdateMaeMfe(t);
@@ -201,6 +214,18 @@ void OnTimer()
          {
             ChartSetInteger(chartId, CHART_AUTOSCROLL, true);
             ChartNavigate(chartId, CHART_END, 0);
+
+            // Pega preço atual do símbolo para centralizar a escala
+            MqlTick t;
+            if(SymbolInfoTick(DestSymbol, t) && t.bid > 0)
+            {
+               double price  = t.bid;
+               double margin = price * 0.01; // 1% acima e abaixo
+               ChartSetInteger(chartId, CHART_SCALEFIX,  true);
+               ChartSetDouble (chartId, CHART_FIXED_MAX, price + margin);
+               ChartSetDouble (chartId, CHART_FIXED_MIN, price - margin);
+            }
+
             ChartRedraw(chartId);
          }
          chartId = ChartNext(chartId);
