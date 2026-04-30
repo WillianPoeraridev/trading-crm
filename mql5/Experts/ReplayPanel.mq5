@@ -296,12 +296,15 @@ void UpdateMaeMfe(const MqlTick &t)
       fav = g_pos.entryPrice - t.ask;
       adv = t.ask - g_pos.entryPrice;
    }
-   if(fav > g_pos.mfePts) g_pos.mfePts = fav;
-   if(adv > g_pos.maePts) g_pos.maePts = adv;
+   double favPts = fav / g_point;
+   double advPts = adv / g_point;
+   if(favPts > g_pos.mfePts) g_pos.mfePts = favPts;
+   if(advPts > g_pos.maePts) g_pos.maePts = advPts;
 
    // hit1R–hit5R
+   double slPts = g_pos.slDist / g_point;
    for(int r=1; r<=5; r++)
-      if(!g_pos.hit[r] && g_pos.mfePts >= r * g_pos.slDist)
+      if(!g_pos.hit[r] && g_pos.mfePts >= r * slPts)
          g_pos.hit[r] = true;
 }
 
@@ -609,11 +612,14 @@ void ComputePostExitMaeMfe(datetime exitTime)
          adv = postTicks[i].ask - g_pos.entryPrice;
       }
 
-      if(fav > g_pos.mfePts) g_pos.mfePts = fav;
-      if(adv > g_pos.maePts) g_pos.maePts = adv;
+      double favPts = fav / g_point;
+      double advPts = adv / g_point;
+      if(favPts > g_pos.mfePts) g_pos.mfePts = favPts;
+      if(advPts > g_pos.maePts) g_pos.maePts = advPts;
 
+      double slPts = g_pos.slDist / g_point;
       for(int r = 1; r <= 5; r++)
-         if(!g_pos.hit[r] && g_pos.mfePts >= r * g_pos.slDist)
+         if(!g_pos.hit[r] && g_pos.mfePts >= slPts * r)
             g_pos.hit[r] = true;
    }
 

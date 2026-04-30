@@ -77,33 +77,17 @@ void OnStart()
 
    PrintFormat("[ReplayEngine] %d ticks carregados. Iniciando loop de replay (speed=%dx, paused=false)", g_total, g_speed);
 
-   // Navega todos os gráficos do DestSymbol para o ponto de início do replay
-   Sleep(3000);
+   // Navega para o início do replay — simples e direto
+   Sleep(2000); // aguarda gráfico renderizar as barras históricas
    long chartId = ChartFirst();
    while(chartId >= 0)
    {
       if(ChartSymbol(chartId) == DestSymbol)
       {
-         ChartSetInteger(chartId, CHART_AUTOSCROLL, false);
-         ChartSetInteger(chartId, CHART_SCALEFIX, false);
-
-         ChartNavigate(chartId, CHART_BEGIN, 0);
-
-         MqlRates rates[];
-         int barCount = CopyRates(DestSymbol, PERIOD_M1, 0, 100000, rates);
-
-         int targetBar = barCount;
-         for(int i = barCount - 1; i >= 0; i--)
-         {
-            if(rates[i].time <= g_startTime)
-            {
-               targetBar = barCount - i;
-               break;
-            }
-         }
-
-         ChartNavigate(chartId, CHART_END, targetBar + 20);
+         // Neste momento as barras históricas já estão no gráfico
+         // e o replay mal começou — CHART_END coloca exatamente no início do replay
          ChartSetInteger(chartId, CHART_AUTOSCROLL, true);
+         ChartNavigate(chartId, CHART_END, 0);
          ChartRedraw(chartId);
       }
       chartId = ChartNext(chartId);
