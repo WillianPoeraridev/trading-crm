@@ -87,7 +87,7 @@ void OnStart()
          ChartSetInteger(chartId, CHART_AUTOSCROLL, false);
          ChartSetInteger(chartId, CHART_SCALEFIX, false);
 
-         ChartNavigate(chartId, CHART_BEGINNING, 0);
+         ChartNavigate(chartId, CHART_BEGIN, 0);
 
          MqlRates rates[];
          int barCount = CopyRates(DestSymbol, PERIOD_M1, 0, 100000, rates);
