@@ -55,16 +55,22 @@ void OnStart()
    if(!SymbolSelect(DestSymbol, true))
       PrintFormat("[ReplayEngine] Aviso: não foi possível adicionar %s ao Market Watch", DestSymbol);
 
+   // Limpa TODO o histórico existente do custom symbol (sessões anteriores)
+   // Ticks devem ser deletados primeiro — CustomTicksDelete remove as barras correspondentes automaticamente
+   long deletedTicks = CustomTicksDelete(DestSymbol, 0, LONG_MAX);
+   long deletedBars  = CustomRatesDelete(DestSymbol, 0, LONG_MAX);
+   PrintFormat("[ReplayEngine] Histórico anterior limpo: %d ticks, %d barras removidos",
+               deletedTicks, deletedBars);
+
    g_startTime = ComputeStartTime(SessionDate);
    PrintFormat("[ReplayEngine] Início do replay: %s (epoch %I64d)", TimeToString(g_startTime, TIME_DATE|TIME_SECONDS), (long)g_startTime);
 
    LoadHistoricalBars();
 
-   // Limpa ticks do período do replay para evitar conflito de ordem com CustomRatesUpdate
-   datetime cleanFrom = g_startTime - 60;
-   datetime cleanTo   = g_startTime + 86400;
-   CustomTicksDelete(DestSymbol, (long)cleanFrom * 1000, (long)cleanTo * 1000);
-   Print("[ReplayEngine] Ticks do período de replay limpos — iniciando injeção");
+   // Garante que não há ticks futuros ao início do replay
+   CustomTicksDelete(DestSymbol, (long)g_startTime * 1000, LONG_MAX);
+   CustomRatesDelete(DestSymbol, g_startTime, LONG_MAX);
+   Print("[ReplayEngine] Dados futuros ao replay removidos");
 
    if(!LoadTicks(g_startTime))
    {
