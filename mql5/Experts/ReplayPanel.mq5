@@ -91,6 +91,7 @@ double          g_point;
 double          g_riskPct;
 
 int             g_timerCount = 0;
+bool            g_navigated  = false;
 
 // Nomes das linhas horizontais
 const string SL_LINE = PRE "SL";
@@ -148,21 +149,6 @@ int OnInit()
    }
 
    Print("[ReplayPanel] Gráficos M5 e H1 verificados/abertos");
-
-   // Aguarda o ReplayEngine carregar e navega para o início do replay
-   Sleep(1000);
-   long navId = ChartFirst();
-   while(navId >= 0)
-   {
-      if(ChartSymbol(navId) == DestSymbol)
-      {
-         ChartSetInteger(navId, CHART_AUTOSCROLL, true);
-         ChartNavigate(navId, CHART_END, 0);
-         ChartRedraw(navId);
-      }
-      navId = ChartNext(navId);
-   }
-
    return INIT_SUCCEEDED;
 }
 
@@ -204,6 +190,24 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
 {
+   // Navegação inicial — executa uma vez após o primeiro timer
+   if(!g_navigated)
+   {
+      g_navigated = true;
+      long chartId = ChartFirst();
+      while(chartId >= 0)
+      {
+         if(ChartSymbol(chartId) == DestSymbol)
+         {
+            ChartSetInteger(chartId, CHART_AUTOSCROLL, true);
+            ChartNavigate(chartId, CHART_END, 0);
+            ChartRedraw(chartId);
+         }
+         chartId = ChartNext(chartId);
+      }
+      return;
+   }
+
    g_timerCount++;
 
    if(g_flashEnd != 0 && TimeCurrent() >= g_flashEnd)
