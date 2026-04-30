@@ -150,7 +150,22 @@ bool LoadHistoricalBars()
    ArraySetAsSeries(rates, false);
 
    datetime from = g_startTime - (30 * 86400); // 30 dias antes do replay
-   datetime to   = g_startTime;                 // até o momento exato do início
+   datetime to   = g_startTime - 60;            // exclui a barra das 16:15 (será criada via ticks)
+
+   // Força sincronização do histórico M1 do source antes de copiar
+   // (Fusion pode não ter o dia atual baixado no cache local)
+   datetime syncFirst = 0;
+   int syncTries = 0;
+   while(syncTries < 10)
+   {
+      if(SeriesInfoInteger(SourceSymbol, PERIOD_M1, SERIES_FIRSTDATE, syncFirst) && syncFirst > 0 && syncFirst <= from)
+         break;
+      Sleep(200);
+      syncTries++;
+   }
+   PrintFormat("[ReplayEngine] Sync histórico M1 de %s: tries=%d, FIRSTDATE=%s",
+               SourceSymbol, syncTries,
+               (syncFirst > 0 ? TimeToString(syncFirst, TIME_DATE|TIME_MINUTES) : "n/d"));
 
    int copied = CopyRates(SourceSymbol, PERIOD_M1, from, to, rates);
    if(copied <= 0)
@@ -159,8 +174,28 @@ bool LoadHistoricalBars()
       return false;
    }
 
+   // Diagnóstico: quantas barras pertencem ao dia do replay (antes de g_startTime)
+   MqlDateTime mdt;
+   TimeToStruct(g_startTime, mdt);
+   datetime dayStart = StructToTime(mdt) - mdt.hour * 3600 - mdt.min * 60 - mdt.sec;
+   int barsOnReplayDay = 0;
+   datetime firstBarOfDay = 0, lastBarOfDay = 0;
+   for(int i = 0; i < copied; i++)
+   {
+      if(rates[i].time >= dayStart && rates[i].time < g_startTime)
+      {
+         if(firstBarOfDay == 0) firstBarOfDay = rates[i].time;
+         lastBarOfDay = rates[i].time;
+         barsOnReplayDay++;
+      }
+   }
+   PrintFormat("[ReplayEngine] Diagnóstico: %d barras totais, %d do dia do replay (de %s até %s)",
+               copied, barsOnReplayDay,
+               (firstBarOfDay > 0 ? TimeToString(firstBarOfDay, TIME_DATE|TIME_MINUTES) : "nenhuma"),
+               (lastBarOfDay  > 0 ? TimeToString(lastBarOfDay,  TIME_DATE|TIME_MINUTES) : "nenhuma"));
+
    int added = CustomRatesUpdate(DestSymbol, rates);
-   PrintFormat("[ReplayEngine] %d barras M1 históricas carregadas no %s (de %s até %s)",
+   PrintFormat("[ReplayEngine] %d barras M1 históricas inseridas no %s (de %s até %s)",
                added, DestSymbol,
                TimeToString(rates[0].time, TIME_DATE|TIME_MINUTES),
                TimeToString(rates[copied-1].time, TIME_DATE|TIME_MINUTES));
