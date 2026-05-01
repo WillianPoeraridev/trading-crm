@@ -14,7 +14,7 @@ input datetime SessionDate       = 0;             // data do replay (0 = hoje)
 input int      OpeningHour       = 16;            // 16 (padrão) ou 15 (horário verão US)
 input int      OpeningMinute     = 15;
 input double   ContractSize      = 1.0;           // tamanho do contrato (Fusion: 1.0)
-input double   TickValue         = 1.0;           // valor do tick em moeda de lucro
+input double   TickValue         = 0.01;          // valor do tick em moeda de lucro (Fusion NAS100: 0.01 → $1/ponto/lote)
 input double   TickSize          = 0.01;          // tamanho do tick (Fusion: 0.01)
 input int      Digits_           = 2;             // dígitos do símbolo
 input string   ProfitCurrency    = "USD";

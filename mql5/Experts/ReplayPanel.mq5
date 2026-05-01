@@ -352,8 +352,8 @@ double CalcRiskUsd()
 double CalcLot(double slDist)
 {
    double riskUsd  = g_capital * g_riskPct / 100.0;
-   double lotValue = g_contractSz * g_tickVal / g_tickSz;
-   if(lotValue <= 0) lotValue = 100.0;
+   double lotValue = g_tickVal / g_tickSz;   // tickVal já inclui contractSize no MT5
+   if(lotValue <= 0) lotValue = 1.0;
    double lot = riskUsd / (slDist * lotValue);
    return NormalizeDouble(MathMax(lot, 0.01), 2);
 }
@@ -367,7 +367,7 @@ double CalcPnl(double exitPrice)
    double diff = (g_pos.direction == "LONG")
                  ? exitPrice - g_pos.entryPrice
                  : g_pos.entryPrice - exitPrice;
-   return diff * g_pos.lotSize * g_contractSz / g_tickSz * g_tickVal;
+   return diff * g_pos.lotSize / g_tickSz * g_tickVal;
 }
 
 //+------------------------------------------------------------------+
