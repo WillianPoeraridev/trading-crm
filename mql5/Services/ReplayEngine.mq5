@@ -10,7 +10,8 @@
 //--- Inputs configuráveis
 input string   SourceSymbol      = "NAS100";      // símbolo de origem (Fusion Markets)
 input string   DestSymbol        = "NAS100_SIM";  // símbolo custom de destino
-input datetime SessionDate       = 0;             // data do replay (0 = hoje)
+input datetime SessionDate       = 0;             // data do replay (0 = última usada ou hoje)
+input datetime EndDate           = 0;             // data final do replay (0 = fim do dia de SessionDate)
 input int      OpeningHour       = 16;            // 16 (padrão) ou 15 (horário verão US)
 input int      OpeningMinute     = 15;
 input double   ContractSize      = 1.0;           // tamanho do contrato (Fusion: 1.0)
@@ -21,7 +22,6 @@ input string   ProfitCurrency    = "USD";
 input string   BaseCurrency      = "USD";
 input string   MarginCurrency    = "USD";
 input int      SpeedDefault      = 1;             // 1, 2, 4, 8, 16 ou 32
-input datetime EndDate           = 0;             // data final do replay (0 = fim do dia de SessionDate)
 input int      MaxTicksPerDay    = 500000;        // capacidade do buffer de ticks
 input int      AtrPeriod         = 10;            // período do ATR
 input ENUM_TIMEFRAMES AtrTimeframe = PERIOD_M15;  // timeframe do ATR
@@ -64,7 +64,23 @@ void OnStart()
    PrintFormat("[ReplayEngine] Histórico anterior limpo: %d ticks, %d barras removidos",
                deletedTicks, deletedBars);
 
-   g_startTime = ComputeStartTime(SessionDate);
+   // Persistência da última data usada
+   datetime effectiveSession;
+   bool sessionIsDefault = (SessionDate == 0 || SessionDate < 86400);
+
+   if(sessionIsDefault)
+   {
+      if(GlobalVariableCheck("replay_last_session"))
+         effectiveSession = (datetime)GlobalVariableGet("replay_last_session");
+      else
+         effectiveSession = TimeCurrent();
+   }
+   else
+      effectiveSession = SessionDate;
+
+   g_startTime = ComputeStartTime(effectiveSession);
+   GlobalVariableSet("replay_last_session", (double)effectiveSession);
+
    PrintFormat("[ReplayEngine] Início do replay: %s (epoch %I64d)", TimeToString(g_startTime, TIME_DATE|TIME_SECONDS), (long)g_startTime);
 
    LoadHistoricalBars();

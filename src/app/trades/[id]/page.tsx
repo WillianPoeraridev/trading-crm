@@ -132,6 +132,73 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
         </CardContent>
       </Card>
 
+      {/* Backtesting section */}
+      {trade.source === 'SIMULATOR' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Backtesting</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
+              <Field
+                label="Capital inicial"
+                value={trade.capitalInicial != null ? `$${trade.capitalInicial.toFixed(2)}` : null}
+              />
+              <Field
+                label="Risco %"
+                value={trade.riskPct != null ? `${trade.riskPct.toFixed(2)}%` : null}
+              />
+              <Field
+                label="Lote"
+                value={trade.lotSize != null ? trade.lotSize.toFixed(2) : null}
+              />
+              <Field label="Duração" value="—" />
+            </dl>
+
+            <dl className="grid grid-cols-3 gap-x-6 gap-y-3">
+              <Field
+                label="SL pts"
+                value={trade.slPoints != null ? Math.round(trade.slPoints).toString() : slPts}
+              />
+              <Field
+                label="TP pts"
+                value={trade.tpPoints != null ? Math.round(trade.tpPoints).toString() : tpPts}
+              />
+              <Field
+                label="PnL líquido"
+                value={trade.pnlNet != null ? `$${trade.pnlNet.toFixed(2)}` : null}
+              />
+            </dl>
+
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">MAE / MFE</p>
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                <div className="rounded-lg border p-3 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">MFE pts</p>
+                  <p className="text-2xl font-bold tabular-nums">
+                    {trade.mfePoints != null ? trade.mfePoints : '—'}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">MAE pts</p>
+                  <p className="text-2xl font-bold tabular-nums">
+                    {trade.maePoints != null ? trade.maePoints : '—'}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">Níveis atingidos</p>
+              <div className="flex gap-3">
+                {hitLevels.map(({ label, hit }) => (
+                  <span key={label} className="text-sm font-medium tabular-nums">
+                    {hit === true ? '✅' : hit === false ? '❌' : '–'} {label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* MAE / MFE card */}
       <Card>
         <CardHeader>
@@ -156,19 +223,11 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
           {/* Hit levels */}
           <div>
             <p className="text-xs text-muted-foreground mb-2">Níveis atingidos</p>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               {hitLevels.map(({ label, hit }) => (
-                <Badge
-                  key={label}
-                  className={cn(
-                    hit === true
-                      ? 'bg-green-500/10 text-green-700 dark:text-green-400'
-                      : 'opacity-40',
-                  )}
-                  variant="outline"
-                >
-                  {label}
-                </Badge>
+                <span key={label} className="text-sm font-medium tabular-nums">
+                  {hit === true ? '✅' : hit === false ? '❌' : '–'} {label}
+                </span>
               ))}
             </div>
           </div>

@@ -67,7 +67,6 @@ function TradeRow({ trade }: { trade: Trade }) {
           </Link>
         </div>
       </td>
-      <td className="px-4 py-2">{trade.instrument}</td>
       <td className="px-4 py-2">
         <Badge variant={trade.direction === 'LONG' ? 'default' : 'secondary'}>
           {trade.direction}
@@ -77,10 +76,14 @@ function TradeRow({ trade }: { trade: Trade }) {
         <SourceBadge source={trade.source} />
       </td>
       <td className="px-4 py-2 text-right tabular-nums">{slPts(trade)}</td>
+      <td className="px-4 py-2 text-right tabular-nums">
+        {trade.lotSize != null ? trade.lotSize.toFixed(2) : '—'}
+      </td>
       <td className="px-4 py-2 text-right tabular-nums">{trade.rrAchieved.toFixed(2)}R</td>
       <td className="px-4 py-2 text-right tabular-nums">
         {trade.pnlNet != null ? `$${trade.pnlNet.toFixed(2)}` : '—'}
       </td>
+      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">—</td>
       <td className="px-4 py-2">
         <Badge
           variant={
@@ -105,12 +108,13 @@ function TradeTable({ trades }: { trades: Trade[] }) {
         <thead className="bg-muted/50">
           <tr>
             <th className="text-left px-4 py-3">Data</th>
-            <th className="text-left px-4 py-3">Instrumento</th>
             <th className="text-left px-4 py-3">Direção</th>
             <th className="text-left px-4 py-3">Source</th>
             <th className="text-right px-4 py-3">SL pts</th>
+            <th className="text-right px-4 py-3">Lote</th>
             <th className="text-right px-4 py-3">R Obtido</th>
             <th className="text-right px-4 py-3">USD</th>
+            <th className="text-right px-4 py-3">Duração</th>
             <th className="text-left px-4 py-3">Resultado</th>
           </tr>
         </thead>

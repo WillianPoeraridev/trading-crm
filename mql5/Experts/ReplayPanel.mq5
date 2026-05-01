@@ -16,8 +16,8 @@ input string   ApiUrl        = "https://trading-crm-main.vercel.app/api/trades";
 input string   ApiKey        = "nas100-sim-2026";
 input double   StartCapital  = 600.0;
 input double   RiskPercent   = 14.0;
-input double   DefaultSLprice = 4.00;  // distância do SL em preço (ex: 4.00 = 400pts NAS100)
-input double   DefaultTPprice = 8.00;  // distância do TP em preço
+input double   DefaultSLprice = 35.0;  // distância do SL em preço (ex: 35.00 = 3500pts NAS100)
+input double   DefaultTPprice = 105.0; // distância do TP em preço (3x o SL padrão)
 input string   DestSymbol    = "NAS100_SIM";
 input string   SourceSymbol  = "NAS100";
 
@@ -541,9 +541,12 @@ void HandleButtonClick(const string name)
 
    if(name == PRE "SL_DN") {
       g_slDist = MathMax(g_slDist - 0.50, 0.50);
+      g_tpDist = g_slDist * 3.0;
       if(g_pos.isOpen) {
          g_pos.slDist  = g_slDist;
          g_pos.slPrice = (g_pos.direction=="LONG") ? g_pos.entryPrice - g_slDist : g_pos.entryPrice + g_slDist;
+         g_pos.tpDist  = g_tpDist;
+         g_pos.tpPrice = (g_pos.direction=="LONG") ? g_pos.entryPrice + g_tpDist : g_pos.entryPrice - g_tpDist;
          DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
          UpdateLineLabels();
          SyncLinesToOtherCharts();
@@ -552,9 +555,12 @@ void HandleButtonClick(const string name)
    }
    if(name == PRE "SL_UP") {
       g_slDist += 0.50;
+      g_tpDist = g_slDist * 3.0;
       if(g_pos.isOpen) {
          g_pos.slDist  = g_slDist;
          g_pos.slPrice = (g_pos.direction=="LONG") ? g_pos.entryPrice - g_slDist : g_pos.entryPrice + g_slDist;
+         g_pos.tpDist  = g_tpDist;
+         g_pos.tpPrice = (g_pos.direction=="LONG") ? g_pos.entryPrice + g_tpDist : g_pos.entryPrice - g_tpDist;
          DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
          UpdateLineLabels();
          SyncLinesToOtherCharts();

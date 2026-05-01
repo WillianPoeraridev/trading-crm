@@ -89,12 +89,18 @@ export default async function MetricsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>RR retroativo</CardTitle>
+              <CardTitle>Análise de RR — o que o mercado fez após a saída</CardTitle>
               <CardDescription>
-                % de trades que atingiram cada nível (entre os que têm dado registrado em hit1R–hit5R)
+                Dos trades com hit registrado: qual % o mercado continuou em favor após a saída
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Cada nível mostra quantos trades chegaram a esse múltiplo de risco depois que
+                você saiu. Se você saiu no TP mas o mercado continuou, esses dados revelam
+                quanto potencial foi deixado na mesa.
+              </p>
+
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {retro.map((r) => (
                   <div key={r.level} className="rounded-lg border p-3">
@@ -110,6 +116,44 @@ export default async function MetricsPage() {
                   </div>
                 ))}
               </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Nível</th>
+                      <th className="text-right py-2 px-4 font-medium text-muted-foreground">Acertos</th>
+                      <th className="text-right py-2 px-4 font-medium text-muted-foreground">Total</th>
+                      <th className="text-right py-2 pl-4 font-medium text-muted-foreground">Taxa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {retro.map((r) => (
+                      <tr key={r.level} className="border-b last:border-0">
+                        <td className="py-2 pr-4 font-medium">{r.level}R</td>
+                        <td className="py-2 px-4 text-right tabular-nums">{r.hit}</td>
+                        <td className="py-2 px-4 text-right tabular-nums">{r.eligible}</td>
+                        <td className="py-2 pl-4 text-right tabular-nums font-medium">
+                          {r.rate != null ? `${(r.rate * 100).toFixed(1)}%` : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {(() => {
+                const r2 = retro.find((r) => r.level === 2)
+                if (!r2 || r2.eligible === 0 || r2.rate == null) return null
+                const pct = (r2.rate * 100).toFixed(0)
+                return (
+                  <p className="text-sm border-l-2 border-primary pl-3">
+                    <strong>{pct}%</strong> dos seus trades chegaram a 2R após a saída. Se você
+                    tivesse deixado correr até 2R nessas operações, o resultado seria
+                    significativamente diferente — use esse dado para calibrar seu alvo.
+                  </p>
+                )
+              })()}
             </CardContent>
           </Card>
         </>

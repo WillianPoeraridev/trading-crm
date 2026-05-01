@@ -1,5 +1,7 @@
+import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { buttonVariants } from '@/components/ui/button'
 import { TrendChart } from '@/components/dashboard/trend-chart'
 import { MonteCarloCard } from '@/components/dashboard/monte-carlo-card'
 import {
@@ -11,24 +13,34 @@ import {
   avgR,
 } from '@/lib/metrics'
 import { format } from 'date-fns'
+import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>
+}) {
+  const { view } = await searchParams
+  const viewSource: 'SIMULATOR' | 'REAL' = view === 'REAL' ? 'REAL' : 'SIMULATOR'
+
   const now = new Date()
   const { start: monthStart, end: monthEnd } = monthRange(now)
   const { start: prevStart, end: prevEnd } = previousMonthRange(now)
 
+  const sourceFilter = { source: viewSource }
+
   const [allTrades, currentMonthTrades, previousMonthTrades, last20, totalCount] = await Promise.all([
-    prisma.trade.findMany({ orderBy: { entryTime: 'desc' } }),
+    prisma.trade.findMany({ where: sourceFilter, orderBy: { entryTime: 'desc' } }),
     prisma.trade.findMany({
-      where: { entryTime: { gte: monthStart, lt: monthEnd } },
+      where: { ...sourceFilter, entryTime: { gte: monthStart, lt: monthEnd } },
     }),
     prisma.trade.findMany({
-      where: { entryTime: { gte: prevStart, lt: prevEnd } },
+      where: { ...sourceFilter, entryTime: { gte: prevStart, lt: prevEnd } },
     }),
-    prisma.trade.findMany({ orderBy: { entryTime: 'desc' }, take: 20 }),
-    prisma.trade.count(),
+    prisma.trade.findMany({ where: sourceFilter, orderBy: { entryTime: 'desc' }, take: 20 }),
+    prisma.trade.count({ where: sourceFilter }),
   ])
 
   const monthR = sumR(currentMonthTrades)
@@ -55,7 +67,23 @@ export default async function Home() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <div className="flex gap-2">
+          <Link
+            href="/?view=SIMULATOR"
+            className={cn(buttonVariants({ variant: viewSource === 'SIMULATOR' ? 'default' : 'outline', size: 'sm' }))}
+          >
+            Simulador
+          </Link>
+          <Link
+            href="/?view=REAL"
+            className={cn(buttonVariants({ variant: viewSource === 'REAL' ? 'default' : 'outline', size: 'sm' }))}
+          >
+            Real
+          </Link>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
