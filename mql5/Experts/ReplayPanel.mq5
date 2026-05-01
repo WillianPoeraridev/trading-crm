@@ -264,6 +264,17 @@ void OnChartEvent(const int id,
    else if(id == CHARTEVENT_OBJECT_DRAG && sparam == TP_LINE)
       HandleTPDrag();
 
+   else if(id == CHARTEVENT_OBJECT_DRAG && sparam == PRE "L_SL_V")
+   {
+      ObjectSetInteger(0, PRE "L_SL_V", OBJPROP_XDISTANCE, PX+6);
+      ObjectSetInteger(0, PRE "L_SL_V", OBJPROP_YDISTANCE, PY+85);
+   }
+   else if(id == CHARTEVENT_OBJECT_DRAG && sparam == PRE "L_TP_V")
+   {
+      ObjectSetInteger(0, PRE "L_TP_V", OBJPROP_XDISTANCE, PX+88);
+      ObjectSetInteger(0, PRE "L_TP_V", OBJPROP_YDISTANCE, PY+85);
+   }
+
    else if(id == CHARTEVENT_OBJECT_ENDEDIT)
    {
       if(sparam == PRE "L_SL_V")
@@ -827,7 +838,7 @@ void CreateEdit(const string name, int x, int y, int w, int h, const string text
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE,   9);
    ObjectSetInteger(0, name, OBJPROP_CORNER,     CORNER_LEFT_UPPER);
    ObjectSetInteger(0, name, OBJPROP_BACK,       false);
-   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
    ObjectSetInteger(0, name, OBJPROP_ALIGN,      ALIGN_CENTER);
 }
 
