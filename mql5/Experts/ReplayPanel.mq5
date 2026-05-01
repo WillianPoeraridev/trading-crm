@@ -94,9 +94,6 @@ double          g_riskPct;
 
 int             g_timerCount = 0;
 bool            g_navigated  = false;
-double          g_fixedMax   = 0;
-double          g_fixedMin   = 0;
-bool            g_scaleSet   = false;
 
 // Nomes das linhas horizontais
 const string SL_LINE = PRE "SL";
@@ -234,12 +231,9 @@ void OnTimer()
             {
                double price  = t.bid;
                double margin = price * 0.01; // 1% acima e abaixo
-               g_fixedMax = price + margin;
-               g_fixedMin = price - margin;
-               g_scaleSet = true;
                ChartSetInteger(chartId, CHART_SCALEFIX,  true);
-               ChartSetDouble (chartId, CHART_FIXED_MAX, g_fixedMax);
-               ChartSetDouble (chartId, CHART_FIXED_MIN, g_fixedMin);
+               ChartSetDouble (chartId, CHART_FIXED_MAX, price + margin);
+               ChartSetDouble (chartId, CHART_FIXED_MIN, price - margin);
             }
 
             ChartRedraw(chartId);
@@ -305,22 +299,6 @@ void OnChartEvent(const int id,
       {
          ChartSetSymbolPeriod(0, DestSymbol, PERIOD_M15);
          Print("[ReplayPanel] Timeframe travado em M15 — use janelas separadas para M5 e H1");
-      }
-
-      // Re-aplica escala vertical fixa em todos os gráficos do DestSymbol
-      if(g_scaleSet)
-      {
-         long cid = ChartFirst();
-         while(cid >= 0)
-         {
-            if(ChartSymbol(cid) == DestSymbol)
-            {
-               ChartSetInteger(cid, CHART_SCALEFIX,  true);
-               ChartSetDouble (cid, CHART_FIXED_MAX, g_fixedMax);
-               ChartSetDouble (cid, CHART_FIXED_MIN, g_fixedMin);
-            }
-            cid = ChartNext(cid);
-         }
       }
 
       PanelDelete();
