@@ -25,6 +25,7 @@ input int      SpeedDefault      = 1;             // 1, 2, 4, 8, 16 ou 32
 input int      MaxTicksPerDay    = 500000;        // capacidade do buffer de ticks
 input int      AtrPeriod         = 10;            // período do ATR
 input ENUM_TIMEFRAMES AtrTimeframe = PERIOD_M15;  // timeframe do ATR
+input bool     LogTickValidation = false;         // loga validação OHLC por barra ao sintetizar
 
 //--- Arquivos de comunicação com o painel (EA)
 #define CMD_FILE "replay_cmd.txt"
@@ -230,63 +231,392 @@ bool LoadHistoricalBars()
 }
 
 //+------------------------------------------------------------------+
-//| Sintetiza ticks a partir de barras OHLC (1 tick por segundo)     |
-//| Interpolação linear: O → primeiro extremo → segundo extremo → C  |
+//| Estrutura para padrão de pontos de referência                    |
+//+------------------------------------------------------------------+
+struct PatternPoints
+{
+   int opening_shadow;
+   int body;
+   int closing_shadow;
+};
+
+//+------------------------------------------------------------------+
+//| Seleciona padrão de referência baseado no tick_volume            |
+//| Replica a tabela do algoritmo "Every tick" do Strategy Tester    |
+//+------------------------------------------------------------------+
+PatternPoints SelectReferencePattern(long tickVolume)
+{
+   PatternPoints pp;
+   if(tickVolume <= 4)        { pp.opening_shadow=1; pp.body=1; pp.closing_shadow=1; }
+   else if(tickVolume <= 6)   { pp.opening_shadow=1; pp.body=2; pp.closing_shadow=1; }
+   else if(tickVolume <= 8)   { pp.opening_shadow=1; pp.body=3; pp.closing_shadow=1; }
+   else if(tickVolume <= 11)  { pp.opening_shadow=1; pp.body=4; pp.closing_shadow=1; }
+   else if(tickVolume <= 15)  { pp.opening_shadow=2; pp.body=3; pp.closing_shadow=2; }
+   else if(tickVolume <= 25)  { pp.opening_shadow=2; pp.body=4; pp.closing_shadow=2; }
+   else if(tickVolume <= 50)  { pp.opening_shadow=2; pp.body=5; pp.closing_shadow=2; }
+   else if(tickVolume <= 100) { pp.opening_shadow=2; pp.body=6; pp.closing_shadow=2; }
+   else                       { pp.opening_shadow=3; pp.body=5; pp.closing_shadow=3; }
+   return pp;
+}
+
+//+------------------------------------------------------------------+
+//| Realoca pontos de sombras ausentes para o corpo                  |
+//+------------------------------------------------------------------+
+void ReallocateMissingShadows(const MqlRates &bar, bool bullish, PatternPoints &pp)
+{
+   // Para bullish (O→L→H→C): sombra de abertura = entre O e L, sombra de fechamento = entre H e C
+   // Para bearish (O→H→L→C): sombra de abertura = entre O e H, sombra de fechamento = entre L e C
+   bool openingShadowMissing, closingShadowMissing;
+   if(bullish)
+   {
+      openingShadowMissing = (bar.low  >= bar.open  - TickSize * 0.5);
+      closingShadowMissing = (bar.high <= bar.close + TickSize * 0.5);
+   }
+   else
+   {
+      openingShadowMissing = (bar.high <= bar.open  + TickSize * 0.5);
+      closingShadowMissing = (bar.low  >= bar.close - TickSize * 0.5);
+   }
+
+   if(openingShadowMissing) { pp.body += pp.opening_shadow; pp.opening_shadow = 0; }
+   if(closingShadowMissing) { pp.body += pp.closing_shadow; pp.closing_shadow = 0; }
+}
+
+//+------------------------------------------------------------------+
+//| Gera pontos de corpo com ondas de impulso (não-linear)           |
+//| Replica o algoritmo "saw-tooth" do MT5 Strategy Tester           |
+//+------------------------------------------------------------------+
+int GenerateBodyPoints(double low, double high, int nPoints, bool ascending,
+                       double point, double &outPrices[])
+{
+   if(nPoints <= 0 || high <= low + point * 0.5)
+      return 0;
+
+   // Trabalha em pontos inteiros para evitar drift de ponto flutuante
+   long loP = (long)MathRound(low  / point);
+   long hiP = (long)MathRound(high / point);
+   long rangeP = hiP - loP;
+   if(rangeP < 1) return 0;
+
+   int waves = (nPoints + 1) / 2;
+   long step = rangeP / MathMax(waves, 1);
+   if(step < 1) step = 1;
+
+   long sign = ascending ? +1 : -1;
+   long prev = ascending ? loP : hiP;
+
+   int written = 0;
+   for(int w = 0; w < waves && written < nPoints; w++)
+   {
+      long n1 = prev + sign * step;
+      // Clamp ao range
+      if(n1 < loP) n1 = loP;
+      if(n1 > hiP) n1 = hiP;
+
+      if(written < nPoints)
+         outPrices[written++] = n1 * point;
+
+      if(written < nPoints)
+      {
+         long n2 = n1 - sign;  // recua 1 ponto (cria oscilação)
+         if(n2 < loP) n2 = loP;
+         if(n2 > hiP) n2 = hiP;
+         outPrices[written++] = n2 * point;
+         prev = n2;
+      }
+      else
+         prev = n1;
+   }
+
+   // Garante que o ponto final chega ao extremo correto
+   if(written > 0)
+      outPrices[written - 1] = ascending ? high : low;
+
+   return written;
+}
+
+//+------------------------------------------------------------------+
+//| Interpola entre dois pontos com saw-tooth ou linear              |
+//+------------------------------------------------------------------+
+int InterpolateBetweenPoints(double p1, double p2, int nIntermediate,
+                             double barLow, double barHigh, double point,
+                             double &outPrices[])
+{
+   if(nIntermediate <= 0)
+      return 0;
+
+   double range = MathAbs(p2 - p1);
+   // Amplitude do saw-tooth: 15% do range entre os pontos, mínimo 1 tick
+   double amplitude = MathMax(point, range * 0.15 / MathMax(nIntermediate, 1));
+   bool useSawtooth = (nIntermediate >= 2);
+
+   for(int k = 1; k <= nIntermediate; k++)
+   {
+      double t = (double)k / (nIntermediate + 1);
+      double linear = p1 + (p2 - p1) * t;
+      double price;
+
+      if(useSawtooth)
+      {
+         double offset = amplitude * ((k % 2 == 0) ? +1.0 : -1.0);
+         price = linear + offset;
+      }
+      else
+         price = linear;
+
+      // Clamp duro ao OHLC da barra
+      price = MathMax(barLow, MathMin(barHigh, price));
+      // Normaliza ao tick size
+      price = MathRound(price / point) * point;
+      outPrices[k - 1] = price;
+   }
+   return nIntermediate;
+}
+
+//+------------------------------------------------------------------+
+//| Emite 1 tick garantindo monotonia de time_msc                    |
+//+------------------------------------------------------------------+
+void EmitTickAt(int idx, long timeMs, double price, double spreadPrice, long &prevMsc)
+{
+   if(timeMs <= prevMsc) timeMs = prevMsc + 1;
+   g_ticks[idx].time     = (datetime)(timeMs / 1000);
+   g_ticks[idx].time_msc = timeMs;
+   g_ticks[idx].bid      = price;
+   g_ticks[idx].ask      = price + spreadPrice;
+   g_ticks[idx].last     = price;
+   g_ticks[idx].flags    = TICK_FLAG_BID | TICK_FLAG_ASK;
+   prevMsc = timeMs;
+}
+
+//+------------------------------------------------------------------+
+//| Jitter temporal: ±20% do intervalo médio (mantém monotonia)      |
+//+------------------------------------------------------------------+
+long CalcJitter(long avgInterval)
+{
+   double r = ((double)MathRand() / 32767.0) * 2.0 - 1.0;  // [-1, +1]
+   return (long)(r * avgInterval * 0.20);
+}
+
+//+------------------------------------------------------------------+
+//| Valida invariantes OHLC por barra na saída sintetizada           |
+//+------------------------------------------------------------------+
+void ValidateSynthOutput(MqlRates &rates[], int count, int firstIdx, int lastIdx, double point)
+{
+   if(!LogTickValidation) return;
+
+   int ok = 0, fail = 0;
+   int tickIdx = firstIdx;
+
+   for(int i = 0; i < count && tickIdx <= lastIdx; i++)
+   {
+      double O = rates[i].open, H = rates[i].high, L = rates[i].low, C = rates[i].close;
+      double tol = point * 1.5;
+
+      // Encontra ticks desta barra
+      datetime barStart = rates[i].time;
+      datetime barEnd   = (i + 1 < count) ? rates[i+1].time : barStart + 86400;
+
+      double minBid = DBL_MAX, maxBid = -DBL_MAX;
+      double firstBid = -1, lastBid = -1;
+
+      while(tickIdx <= lastIdx && g_ticks[tickIdx].time < barEnd)
+      {
+         double b = g_ticks[tickIdx].bid;
+         if(firstBid < 0) firstBid = b;
+         lastBid = b;
+         if(b < minBid) minBid = b;
+         if(b > maxBid) maxBid = b;
+         tickIdx++;
+      }
+
+      if(firstBid < 0) continue;
+
+      bool passed = (MathAbs(firstBid - O) <= tol) &&
+                    (MathAbs(lastBid  - C) <= tol) &&
+                    (MathAbs(maxBid   - H) <= tol) &&
+                    (MathAbs(minBid   - L) <= tol);
+      if(passed) ok++;
+      else
+      {
+         fail++;
+         PrintFormat("[Validate] FALHOU barra %s: O=%.2f(got%.2f) H=%.2f(got%.2f) L=%.2f(got%.2f) C=%.2f(got%.2f)",
+                     TimeToString(barStart, TIME_DATE|TIME_MINUTES),
+                     O, firstBid, H, maxBid, L, minBid, C, lastBid);
+      }
+   }
+
+   PrintFormat("[ReplayEngine] Validação: %d/%d barras OK (%d falhas)", ok, ok+fail, fail);
+}
+
+//+------------------------------------------------------------------+
+//| Sintetiza ticks a partir de barras OHLC                          |
+//| Algoritmo: replica o "Every tick" do MT5 Strategy Tester         |
+//| (11 pontos de referência, ondas de impulso, saw-tooth)           |
 //+------------------------------------------------------------------+
 bool SynthesizeTicks(MqlRates &rates[], int count, int barSecs, ENUM_TIMEFRAMES tf)
 {
+   double point       = SymbolInfoDouble(SourceSymbol, SYMBOL_POINT);
+   if(point <= 0) point = TickSize;
    long   spreadPts   = SymbolInfoInteger(SourceSymbol, SYMBOL_SPREAD);
-   double spreadPrice = spreadPts * SymbolInfoDouble(SourceSymbol, SYMBOL_POINT);
-   if(spreadPrice <= 0) spreadPrice = TickSize;
+   double spreadPrice = (spreadPts > 0) ? spreadPts * point : TickSize;
 
-   int nTicks = count * barSecs;
-   if(nTicks > MaxTicksPerDay)
+   const int MAX_TICKS_PER_BAR = 2000;
+
+   // Estimativa de ticks totais usando tick_volume real das barras.
+   // Mínimo de 20 por barra para cobrir os âncoras (padrão 3-5-3 = 15 pts + intermediários).
+   long totalEstimate = 0;
+   for(int i = 0; i < count; i++)
    {
-      PrintFormat("[ReplayEngine] Aviso: %d ticks excedem buffer %d — truncando", nTicks, MaxTicksPerDay);
-      nTicks = MaxTicksPerDay;
+      long tv = rates[i].tick_volume;
+      if(tv < 20)  tv = 20;
+      if(tv > MAX_TICKS_PER_BAR) tv = MAX_TICKS_PER_BAR;
+      totalEstimate += tv;
    }
-   ArrayResize(g_ticks, nTicks);
+   if(totalEstimate <= 0) totalEstimate = count * 20;
+   if(totalEstimate > MaxTicksPerDay) totalEstimate = MaxTicksPerDay;
+
+   ArrayResize(g_ticks, (int)totalEstimate);
    ArraySetAsSeries(g_ticks, false);
 
-   int stage1End = barSecs / 4;        // 25% — chega no primeiro extremo
-   int stage2End = (barSecs * 3) / 4;  // 75% — chega no segundo extremo
+   int  idx    = 0;
+   long prevMsc = 0;
+   int  firstIdx = 0;
 
-   int idx = 0;
-   for(int i = 0; i < count && idx < nTicks; i++)
+   for(int i = 0; i < count; i++)
    {
-      bool   bullish = (rates[i].close >= rates[i].open);
-      long   t  = (long)rates[i].time * 1000LL;
-      double O  = rates[i].open;
-      double L  = rates[i].low;
-      double H  = rates[i].high;
-      double C  = rates[i].close;
-      double m1 = bullish ? L : H;
-      double m2 = bullish ? H : L;
+      if(idx >= MaxTicksPerDay) { PrintFormat("[ReplayEngine] Buffer MaxTicksPerDay atingido na barra %d", i); break; }
+      // Garante espaço para mais 2000 ticks (1 barra inteira no pior caso)
+      if(idx + MAX_TICKS_PER_BAR + 20 > ArraySize(g_ticks))
+         ArrayResize(g_ticks, MathMin(idx + MAX_TICKS_PER_BAR + 20, MaxTicksPerDay));
 
-      for(int sec = 0; sec < barSecs && idx < nTicks; sec++, idx++)
+      MqlRates bar      = rates[i];
+      long barStartMs   = (long)bar.time * 1000LL;
+      long nTicksBar    = bar.tick_volume;
+      if(nTicksBar <= 0) { PrintFormat("[ReplayEngine] Aviso: tick_volume=0 na barra %s — usando 1", TimeToString(bar.time, TIME_DATE|TIME_MINUTES)); nTicksBar = 1; }
+      if(nTicksBar > MAX_TICKS_PER_BAR) nTicksBar = MAX_TICKS_PER_BAR;
+
+      // ---- Casos especiais ----
+      if(nTicksBar == 1)
       {
-         double price;
-         if(sec < stage1End)
-            price = O  + (m1 - O ) * (double)sec / stage1End;
-         else if(sec < stage2End)
-            price = m1 + (m2 - m1) * (double)(sec - stage1End) / (stage2End - stage1End);
-         else
-            price = m2 + (C  - m2) * (double)(sec - stage2End) / (barSecs - stage2End);
+         EmitTickAt(idx++, barStartMs + barSecs * 1000LL - 1, bar.close, spreadPrice, prevMsc);
+         continue;
+      }
+      if(nTicksBar == 2)
+      {
+         EmitTickAt(idx++, barStartMs,                         bar.open,  spreadPrice, prevMsc);
+         EmitTickAt(idx++, barStartMs + barSecs * 1000LL - 1, bar.close, spreadPrice, prevMsc);
+         continue;
+      }
 
-         long tickMs = t + (long)sec * 1000LL;
-         g_ticks[idx].time     = (datetime)(tickMs / 1000);
-         g_ticks[idx].time_msc = tickMs;
-         g_ticks[idx].bid      = price;
-         g_ticks[idx].ask      = price + spreadPrice;
-         g_ticks[idx].last     = price;
-         g_ticks[idx].flags    = TICK_FLAG_BID | TICK_FLAG_ASK;
+      // ---- Direção ----
+      bool bullish;
+      if(bar.close > bar.open)      bullish = true;
+      else if(bar.close < bar.open) bullish = false;
+      else  // doji: inverte a direção da barra anterior
+         bullish = (i > 0) ? (rates[i-1].close < rates[i-1].open) : true;
+
+      // ---- Pontos de referência ----
+      PatternPoints pp = SelectReferencePattern(nTicksBar);
+      ReallocateMissingShadows(bar, bullish, pp);
+
+      // ---- Constrói sequência de âncoras ----
+      // Bullish: O → [shadow_pts] → L → [body_pts] → H → [shadow_pts] → C
+      // Bearish: O → [shadow_pts] → H → [body_pts] → L → [shadow_pts] → C
+      double anchors[];
+      int maxAnchors = 4 + pp.opening_shadow + pp.body + pp.closing_shadow;
+      ArrayResize(anchors, maxAnchors);
+      int a = 0;
+
+      anchors[a++] = bar.open;
+
+      double ext1 = bullish ? bar.low  : bar.high;  // primeiro extremo após open
+      double ext2 = bullish ? bar.high : bar.low;   // segundo extremo antes de close
+
+      // Sombra de abertura (linear entre open e ext1)
+      for(int k = 1; k <= pp.opening_shadow; k++)
+         anchors[a++] = bar.open + (ext1 - bar.open) * (double)k / (pp.opening_shadow + 1);
+
+      anchors[a++] = ext1;
+
+      // Corpo (ondas de impulso entre ext1 e ext2)
+      if(pp.body > 0)
+      {
+         double bodyPts[];
+         ArrayResize(bodyPts, pp.body);
+         int n = GenerateBodyPoints(bar.low, bar.high, pp.body, bullish, point, bodyPts);
+         for(int k = 0; k < n; k++)
+            anchors[a++] = bodyPts[k];
+      }
+
+      anchors[a++] = ext2;
+
+      // Sombra de fechamento (linear entre ext2 e close)
+      for(int k = 1; k <= pp.closing_shadow; k++)
+         anchors[a++] = ext2 + (bar.close - ext2) * (double)k / (pp.closing_shadow + 1);
+
+      anchors[a++] = bar.close;
+      int nAnchors = a;
+
+      // ---- Distribui ticks intermediários entre segmentos ----
+      long ticksRem = nTicksBar - nAnchors;
+      if(ticksRem < 0) ticksRem = 0;
+      int segCount  = nAnchors - 1;
+      int perSegBase  = (segCount > 0) ? (int)(ticksRem / segCount) : 0;
+      int perSegExtra = (segCount > 0) ? (int)(ticksRem % segCount) : 0;
+
+      long avgIntervalMs = (nTicksBar > 0) ? ((long)barSecs * 1000LL / nTicksBar) : 1000LL;
+      if(avgIntervalMs < 1) avgIntervalMs = 1;
+
+      long localCursor = barStartMs;
+
+      for(int s = 0; s < segCount; s++)
+      {
+         if(idx >= MaxTicksPerDay) break;
+
+         double p1 = anchors[s];
+         double p2 = anchors[s + 1];
+         int nInter = perSegBase + (s < perSegExtra ? 1 : 0);
+
+         // Emite âncora s (exceto na segunda iteração em diante, pois já foi emitida como p2 anterior)
+         if(s == 0)
+         {
+            EmitTickAt(idx++, localCursor, p1, spreadPrice, prevMsc);
+            localCursor += avgIntervalMs + CalcJitter(avgIntervalMs);
+         }
+
+         // Ticks intermediários
+         if(nInter > 0)
+         {
+            double interBuf[];
+            ArrayResize(interBuf, nInter);
+            int got = InterpolateBetweenPoints(p1, p2, nInter, bar.low, bar.high, point, interBuf);
+            for(int k = 0; k < got && idx < MaxTicksPerDay; k++)
+            {
+               long jitter = CalcJitter(avgIntervalMs);
+               EmitTickAt(idx++, localCursor + jitter, interBuf[k], spreadPrice, prevMsc);
+               localCursor += avgIntervalMs;
+            }
+         }
+
+         // Emite âncora s+1 (= p2)
+         if(idx < MaxTicksPerDay)
+         {
+            // Último segmento: cravar o close exatamente no fim da barra
+            long ts = (s == segCount - 1)
+                      ? (barStartMs + (long)barSecs * 1000LL - 1)
+                      : (localCursor + CalcJitter(avgIntervalMs));
+            EmitTickAt(idx++, ts, p2, spreadPrice, prevMsc);
+            localCursor += avgIntervalMs;
+         }
       }
    }
 
    g_total = idx;
    ArrayResize(g_ticks, g_total);
-   PrintFormat("[ReplayEngine] Sintetizados %d ticks a partir de %d barras %s (1 tick/seg)",
+   PrintFormat("[ReplayEngine] Sintetizados %d ticks a partir de %d barras %s (algoritmo MT5 Every-Tick)",
                g_total, count, EnumToString(tf));
+
+   ValidateSynthOutput(rates, count, firstIdx, g_total - 1, point);
    return g_total > 0;
 }
 
