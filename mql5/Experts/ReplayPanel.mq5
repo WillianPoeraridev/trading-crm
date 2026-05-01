@@ -90,7 +90,6 @@ double          g_point;
 // Risco ajustável em tempo real (inicializado a partir do input RiskPercent)
 double          g_riskPct;
 
-bool            g_editingField = false; // true enquanto usuário edita SL ou TP
 
 int             g_timerCount = 0;
 bool            g_navigated  = false;
@@ -263,13 +262,7 @@ void OnChartEvent(const int id,
                   const string &sparam)
 {
    if(id == CHARTEVENT_OBJECT_CLICK)
-   {
-      if(sparam == PRE "L_SL_V" || sparam == PRE "L_TP_V")
-         g_editingField = true;
-      else
-         g_editingField = false;
       HandleButtonClick(sparam);
-   }
 
    else if(id == CHARTEVENT_OBJECT_DRAG && sparam == SL_LINE)
    {
@@ -295,54 +288,6 @@ void OnChartEvent(const int id,
       ObjectSetDouble(0, PRE "LBL_TP", OBJPROP_PRICE, newTP);
       ChartRedraw();
       HandleTPDrag();
-   }
-
-   else if(id == CHARTEVENT_OBJECT_DRAG && sparam == PRE "L_SL_V")
-   {
-      ObjectSetInteger(0, PRE "L_SL_V", OBJPROP_XDISTANCE, PX+6);
-      ObjectSetInteger(0, PRE "L_SL_V", OBJPROP_YDISTANCE, PY+85);
-   }
-   else if(id == CHARTEVENT_OBJECT_DRAG && sparam == PRE "L_TP_V")
-   {
-      ObjectSetInteger(0, PRE "L_TP_V", OBJPROP_XDISTANCE, PX+88);
-      ObjectSetInteger(0, PRE "L_TP_V", OBJPROP_YDISTANCE, PY+85);
-   }
-
-   else if(id == CHARTEVENT_OBJECT_ENDEDIT)
-   {
-      g_editingField = false;
-      if(sparam == PRE "L_SL_V")
-      {
-         double val = StringToDouble(ObjectGetString(0, PRE "L_SL_V", OBJPROP_TEXT));
-         if(val > 0)
-         {
-            g_slDist = val;
-            if(g_pos.isOpen)
-            {
-               g_pos.slDist  = val;
-               g_pos.slPrice = (g_pos.direction == "LONG") ? g_pos.entryPrice - val : g_pos.entryPrice + val;
-               DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
-            }
-         }
-         UpdateSLTPFields();
-         PanelUpdate();
-      }
-      else if(sparam == PRE "L_TP_V")
-      {
-         double val = StringToDouble(ObjectGetString(0, PRE "L_TP_V", OBJPROP_TEXT));
-         if(val > 0)
-         {
-            g_tpDist = val;
-            if(g_pos.isOpen)
-            {
-               g_pos.tpDist  = val;
-               g_pos.tpPrice = (g_pos.direction == "LONG") ? g_pos.entryPrice + val : g_pos.entryPrice - val;
-               DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
-            }
-         }
-         UpdateSLTPFields();
-         PanelUpdate();
-      }
    }
 
    else if(id == CHARTEVENT_CHART_CHANGE)
@@ -577,6 +522,51 @@ void HandleButtonClick(const string name)
 
    if(name == PRE "RISK_UP") { g_riskPct = MathMin(g_riskPct + 1.0, 50.0); PanelUpdate(); return; }
    if(name == PRE "RISK_DN") { g_riskPct = MathMax(g_riskPct - 1.0,  1.0); PanelUpdate(); return; }
+
+   if(name == PRE "SL_DN") {
+      g_slDist = MathMax(g_slDist - 0.50, 0.50);
+      if(g_pos.isOpen) {
+         g_pos.slDist  = g_slDist;
+         g_pos.slPrice = (g_pos.direction=="LONG") ? g_pos.entryPrice - g_slDist : g_pos.entryPrice + g_slDist;
+         DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
+         UpdateLineLabels();
+         SyncLinesToOtherCharts();
+      }
+      UpdateSLTPFields(); PanelUpdate(); return;
+   }
+   if(name == PRE "SL_UP") {
+      g_slDist += 0.50;
+      if(g_pos.isOpen) {
+         g_pos.slDist  = g_slDist;
+         g_pos.slPrice = (g_pos.direction=="LONG") ? g_pos.entryPrice - g_slDist : g_pos.entryPrice + g_slDist;
+         DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
+         UpdateLineLabels();
+         SyncLinesToOtherCharts();
+      }
+      UpdateSLTPFields(); PanelUpdate(); return;
+   }
+   if(name == PRE "TP_DN") {
+      g_tpDist = MathMax(g_tpDist - 0.50, 0.50);
+      if(g_pos.isOpen) {
+         g_pos.tpDist  = g_tpDist;
+         g_pos.tpPrice = (g_pos.direction=="LONG") ? g_pos.entryPrice + g_tpDist : g_pos.entryPrice - g_tpDist;
+         DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
+         UpdateLineLabels();
+         SyncLinesToOtherCharts();
+      }
+      UpdateSLTPFields(); PanelUpdate(); return;
+   }
+   if(name == PRE "TP_UP") {
+      g_tpDist += 0.50;
+      if(g_pos.isOpen) {
+         g_pos.tpDist  = g_tpDist;
+         g_pos.tpPrice = (g_pos.direction=="LONG") ? g_pos.entryPrice + g_tpDist : g_pos.entryPrice - g_tpDist;
+         DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
+         UpdateLineLabels();
+         SyncLinesToOtherCharts();
+      }
+      UpdateSLTPFields(); PanelUpdate(); return;
+   }
 
    if(name == PRE "BUY")       { if(!g_pos.isOpen) OpenPosition("LONG");  return; }
    if(name == PRE "SELL")      { if(!g_pos.isOpen) OpenPosition("SHORT"); return; }
@@ -936,11 +926,10 @@ void SetBtnBg(const string name, color clr)
 
 void UpdateSLTPFields()
 {
-   if(g_editingField) return;
    double sl = g_pos.isOpen ? g_pos.slDist : g_slDist;
    double tp = g_pos.isOpen ? g_pos.tpDist : g_tpDist;
-   ObjectSetString(0, PRE "L_SL_V", OBJPROP_TEXT, StringFormat("%.2f", sl));
-   ObjectSetString(0, PRE "L_TP_V", OBJPROP_TEXT, StringFormat("%.2f", tp));
+   SetLabel(PRE "L_SL_V", StringFormat("%.2f", sl));
+   SetLabel(PRE "L_TP_V", StringFormat("%.2f", tp));
 }
 
 //+------------------------------------------------------------------+
@@ -1079,10 +1068,15 @@ void PanelCreate()
    CreateLabel(PRE "L_LOT_V",  x+90, y+54,  "0.00",          CLR_TEXT,  9);
 
    // --- Linha 3: SL | TP
-   CreateLabel(PRE "L_SL_T",   x+8,  y+74,  "SL (dist)",     CLR_MUTED, 8);
-   CreateEdit (PRE "L_SL_V",   x+6,  y+85,  76, 17, StringFormat("%.2f", g_slDist));
-   CreateLabel(PRE "L_TP_T",   x+90, y+74,  "TP (dist)",     CLR_MUTED, 8);
-   CreateEdit (PRE "L_TP_V",   x+88, y+85,  76, 17, StringFormat("%.2f", g_tpDist));
+   CreateLabel(PRE "L_SL_T",  x+8,   y+74, "SL (dist)", CLR_MUTED, 8);
+   CreateLabel(PRE "L_SL_V",  x+8,   y+86, StringFormat("%.2f", g_slDist), CLR_TEXT, 9);
+   CreateBtn  (PRE "SL_DN",   x+52,  y+83, 18, 16, "-", CLR_BG2);
+   CreateBtn  (PRE "SL_UP",   x+72,  y+83, 18, 16, "+", CLR_BG2);
+
+   CreateLabel(PRE "L_TP_T",  x+90,  y+74, "TP (dist)", CLR_MUTED, 8);
+   CreateLabel(PRE "L_TP_V",  x+90,  y+86, StringFormat("%.2f", g_tpDist), CLR_TEXT, 9);
+   CreateBtn  (PRE "TP_DN",   x+134, y+83, 18, 16, "-", CLR_BG2);
+   CreateBtn  (PRE "TP_UP",   x+154, y+83, 18, 16, "+", CLR_BG2);
 
    // --- Linha 4: PnL (só com posição)
    CreateLabel(PRE "L_PNL_T",  x+8,  y+106, "PnL",           CLR_MUTED, 8);
@@ -1136,7 +1130,8 @@ void PanelDelete()
       PRE "BUY", PRE "SELL", PRE "CLOSE", PRE "PAUSE",
       PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16", PRE "SPD32",
       PRE "L_SPD", PRE "L_SYM", PRE "L_TIMER_T", PRE "L_TIMER_V",
-      PRE "RISK_UP", PRE "RISK_DN"
+      PRE "RISK_UP", PRE "RISK_DN",
+      PRE "SL_DN", PRE "SL_UP", PRE "TP_DN", PRE "TP_UP"
    };
    for(int i = 0; i < ArraySize(panelObjs); i++)
       ObjectDelete(0, panelObjs[i]);
