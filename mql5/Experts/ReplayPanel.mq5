@@ -162,6 +162,11 @@ void OnDeinit(const int reason)
 {
    EventKillTimer();
    PanelDelete();
+   ObjectDelete(0, PRE "LBL_SL");
+   ObjectDelete(0, PRE "LBL_TP");
+   ObjectDelete(0, SL_LINE + "_HDL");
+   ObjectDelete(0, TP_LINE + "_HDL");
+   ObjectDelete(0, EN_LINE + "_HDL");
    ObjectDelete(0, SL_LINE);
    ObjectDelete(0, TP_LINE);
    ObjectDelete(0, EN_LINE);
@@ -267,10 +272,30 @@ void OnChartEvent(const int id,
    }
 
    else if(id == CHARTEVENT_OBJECT_DRAG && sparam == SL_LINE)
+   {
+      double newSL = ObjectGetDouble(0, SL_LINE, OBJPROP_PRICE);
+      double dist  = MathAbs(newSL - g_pos.entryPrice);
+      int    pts   = (int)MathRound(dist / g_point) * 10;
+      double usd   = g_pos.lotSize * g_contractSz * dist * g_tickVal / g_tickSz;
+      double pct   = usd / g_capital * 100.0;
+      ObjectSetString(0, PRE "LBL_SL", OBJPROP_TEXT,  StringFormat("▼ %d pts  -$%.2f  %.1f%%", pts, usd, pct));
+      ObjectSetDouble(0, PRE "LBL_SL", OBJPROP_PRICE, newSL);
+      ChartRedraw();
       HandleSLDrag();
+   }
 
    else if(id == CHARTEVENT_OBJECT_DRAG && sparam == TP_LINE)
+   {
+      double newTP = ObjectGetDouble(0, TP_LINE, OBJPROP_PRICE);
+      double dist  = MathAbs(newTP - g_pos.entryPrice);
+      int    pts   = (int)MathRound(dist / g_point) * 10;
+      double usd   = g_pos.lotSize * g_contractSz * dist * g_tickVal / g_tickSz;
+      double pct   = usd / g_capital * 100.0;
+      ObjectSetString(0, PRE "LBL_TP", OBJPROP_TEXT,  StringFormat("▲ %d pts  +$%.2f  %.1f%%", pts, usd, pct));
+      ObjectSetDouble(0, PRE "LBL_TP", OBJPROP_PRICE, newTP);
+      ChartRedraw();
       HandleTPDrag();
+   }
 
    else if(id == CHARTEVENT_OBJECT_DRAG && sparam == PRE "L_SL_V")
    {
@@ -454,6 +479,7 @@ void OpenPosition(string direction)
    g_pos.tpPrice = (direction == "LONG") ? entry + tpDist : entry - tpDist;
 
    DrawLines(entry, g_pos.slPrice, g_pos.tpPrice);
+   UpdateLineLabels();
    SyncLinesToOtherCharts();
    TakeScreenshot("open_" + direction + "_" + IntegerToString((int)t.time));
    UpdateSLTPFields();
@@ -486,6 +512,11 @@ void ClosePosition(double exitPrice, string reason, const MqlTick &t)
    SendTradeToApi(json);
 
    FlashPanel(win);
+   ObjectDelete(0, PRE "LBL_SL");
+   ObjectDelete(0, PRE "LBL_TP");
+   ObjectDelete(0, SL_LINE + "_HDL");
+   ObjectDelete(0, TP_LINE + "_HDL");
+   ObjectDelete(0, EN_LINE + "_HDL");
    ObjectDelete(0, SL_LINE);
    ObjectDelete(0, TP_LINE);
    ObjectDelete(0, EN_LINE);
@@ -513,6 +544,7 @@ void HandleSLDrag()
    g_slDist      = g_pos.slDist;
 
    SyncLinesToOtherCharts();
+   UpdateLineLabels();
    UpdateSLTPFields();
    PanelUpdate();
 }
@@ -530,6 +562,7 @@ void HandleTPDrag()
    g_tpDist      = g_pos.tpDist;
 
    SyncLinesToOtherCharts();
+   UpdateLineLabels();
    UpdateSLTPFields();
    PanelUpdate();
 }
@@ -764,10 +797,18 @@ void CreateHLine(const string name, double price, color clr, const string lbl)
    ObjectCreate(0, name, OBJ_HLINE, 0, 0, price);
    ObjectSetInteger(0, name, OBJPROP_COLOR,      clr);
    ObjectSetInteger(0, name, OBJPROP_STYLE,      STYLE_DOT);
-   ObjectSetInteger(0, name, OBJPROP_WIDTH,      1);
+   ObjectSetInteger(0, name, OBJPROP_WIDTH,      3);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
    ObjectSetInteger(0, name, OBJPROP_BACK,       false);
    ObjectSetString (0, name, OBJPROP_TEXT,       lbl);
+
+   string hdl = name + "_HDL";
+   ObjectDelete(0, hdl);
+   ObjectCreate(0, hdl, OBJ_ARROW_RIGHT_PRICE, 0, TimeCurrent(), price);
+   ObjectSetInteger(0, hdl, OBJPROP_COLOR,      clr);
+   ObjectSetInteger(0, hdl, OBJPROP_WIDTH,      2);
+   ObjectSetInteger(0, hdl, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, hdl, OBJPROP_BACK,       false);
 }
 
 //+------------------------------------------------------------------+
@@ -778,6 +819,37 @@ void DrawLines(double entry, double sl, double tp)
    CreateHLine(EN_LINE, entry, clrDodgerBlue, "Entrada");
    CreateHLine(SL_LINE, sl,    clrRed,        "SL");
    CreateHLine(TP_LINE, tp,    clrLime,        "TP");
+}
+
+void CreateLineLabel(const string name, double price, const string text, color clr, bool above)
+{
+   ObjectDelete(0, name);
+   ObjectCreate(0, name, OBJ_TEXT, 0, iTime(DestSymbol, PERIOD_M15, 0), price);
+   ObjectSetString (0, name, OBJPROP_TEXT,      text);
+   ObjectSetInteger(0, name, OBJPROP_COLOR,      clr);
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE,   8);
+   ObjectSetString (0, name, OBJPROP_FONT,       "Courier New");
+   ObjectSetInteger(0, name, OBJPROP_ANCHOR,     above ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_BACK,       false);
+}
+
+void UpdateLineLabels()
+{
+   if(!g_pos.isOpen) return;
+
+   int    slPts  = (int)MathRound(g_pos.slDist / g_point) * 10;
+   double slUsd  = g_pos.lotSize * g_contractSz * g_pos.slDist * g_tickVal / g_tickSz;
+   double slPct  = slUsd / g_capital * 100.0;
+   string slText = StringFormat("▼ %d pts  -$%.2f  %.1f%%", slPts, slUsd, slPct);
+
+   int    tpPts  = (int)MathRound(g_pos.tpDist / g_point) * 10;
+   double tpUsd  = g_pos.lotSize * g_contractSz * g_pos.tpDist * g_tickVal / g_tickSz;
+   double tpPct  = tpUsd / g_capital * 100.0;
+   string tpText = StringFormat("▲ %d pts  +$%.2f  %.1f%%", tpPts, tpUsd, tpPct);
+
+   CreateLineLabel(PRE "LBL_SL", g_pos.slPrice, slText, clrRed,  false);
+   CreateLineLabel(PRE "LBL_TP", g_pos.tpPrice, tpText, clrLime, true);
 }
 
 //+------------------------------------------------------------------+
