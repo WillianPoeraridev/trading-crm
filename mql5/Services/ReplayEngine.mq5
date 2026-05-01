@@ -248,6 +248,13 @@ bool LoadTicksFromBars(datetime startTime)
    ArrayResize(g_ticks, nTicks);
    ArraySetAsSeries(g_ticks, false);
 
+   // Distribui os 4 ticks ao longo do minuto: Open=0s, extremo1=15s, extremo2=45s, Close=59.999s
+   long offsets[4];
+   offsets[0] = 0;
+   offsets[1] = 15000;
+   offsets[2] = 45000;
+   offsets[3] = 59999;
+
    int idx = 0;
    for(int i = 0; i < copied; i++)
    {
@@ -262,8 +269,9 @@ bool LoadTicksFromBars(datetime startTime)
 
       for(int j = 0; j < 4; j++, idx++)
       {
-         g_ticks[idx].time     = (datetime)(t / 1000);
-         g_ticks[idx].time_msc = t + j;
+         long tickMs = t + offsets[j];
+         g_ticks[idx].time     = (datetime)(tickMs / 1000);
+         g_ticks[idx].time_msc = tickMs;
          g_ticks[idx].bid      = prices[j];
          g_ticks[idx].ask      = prices[j] + spreadPrice;
          g_ticks[idx].last     = prices[j];
