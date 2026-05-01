@@ -20,7 +20,7 @@ input int      Digits_           = 2;             // dígitos do símbolo
 input string   ProfitCurrency    = "USD";
 input string   BaseCurrency      = "USD";
 input string   MarginCurrency    = "USD";
-input int      SpeedDefault      = 1;             // 1, 2, 4 ou 8
+input int      SpeedDefault      = 1;             // 1, 2, 4, 8 ou 16
 input int      MaxTicksPerDay    = 500000;        // capacidade do buffer de ticks
 input int      AtrPeriod         = 10;            // período do ATR
 input ENUM_TIMEFRAMES AtrTimeframe = PERIOD_M15;  // timeframe do ATR
@@ -44,7 +44,7 @@ datetime g_startTime = 0;
 //+------------------------------------------------------------------+
 void OnStart()
 {
-   g_speed = (SpeedDefault==1 || SpeedDefault==2 || SpeedDefault==4 || SpeedDefault==8) ? SpeedDefault : 1;
+   g_speed = (SpeedDefault==1 || SpeedDefault==2 || SpeedDefault==4 || SpeedDefault==8 || SpeedDefault==16) ? SpeedDefault : 1;
 
    if(!EnsureCustomSymbol())
    {
@@ -306,7 +306,7 @@ void ProcessCommandFile()
    {
       string val = StringSubstr(cmd, 6);
       int s = (int)StringToInteger(val);
-      if(s == 1 || s == 2 || s == 4 || s == 8)
+      if(s == 1 || s == 2 || s == 4 || s == 8 || s == 16)
       {
          g_speed = s;
          PrintFormat("[ReplayEngine] CMD SPEED=%d", g_speed);

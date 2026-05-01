@@ -264,6 +264,40 @@ void OnChartEvent(const int id,
    else if(id == CHARTEVENT_OBJECT_DRAG && sparam == TP_LINE)
       HandleTPDrag();
 
+   else if(id == CHARTEVENT_OBJECT_ENDEDIT)
+   {
+      if(sparam == PRE "L_SL_V")
+      {
+         double val = StringToDouble(ObjectGetString(0, PRE "L_SL_V", OBJPROP_TEXT));
+         if(val > 0)
+         {
+            g_slDist = val;
+            if(g_pos.isOpen)
+            {
+               g_pos.slDist  = val;
+               g_pos.slPrice = (g_pos.direction == "LONG") ? g_pos.entryPrice - val : g_pos.entryPrice + val;
+               DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
+            }
+         }
+         PanelUpdate();
+      }
+      else if(sparam == PRE "L_TP_V")
+      {
+         double val = StringToDouble(ObjectGetString(0, PRE "L_TP_V", OBJPROP_TEXT));
+         if(val > 0)
+         {
+            g_tpDist = val;
+            if(g_pos.isOpen)
+            {
+               g_pos.tpDist  = val;
+               g_pos.tpPrice = (g_pos.direction == "LONG") ? g_pos.entryPrice + val : g_pos.entryPrice - val;
+               DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
+            }
+         }
+         PanelUpdate();
+      }
+   }
+
    else if(id == CHARTEVENT_CHART_CHANGE)
    {
       if(ChartPeriod(0) != PERIOD_M15)
@@ -510,9 +544,9 @@ void HandleButtonClick(const string name)
    }
 
    // Botões de velocidade
-   string speedNames[] = { PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8" };
-   int    speedVals[]  = { 1, 2, 4, 8 };
-   for(int i=0; i<4; i++)
+   string speedNames[] = { PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16" };
+   int    speedVals[]  = { 1, 2, 4, 8, 16 };
+   for(int i=0; i<5; i++)
    {
       if(name == speedNames[i])
       {
@@ -778,6 +812,25 @@ void SetLabel(const string name, const string text, color clr = CLR_TEXT)
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
 }
 
+void CreateEdit(const string name, int x, int y, int w, int h, const string text)
+{
+   ObjectDelete(0, name);
+   ObjectCreate(0, name, OBJ_EDIT, 0, 0, 0);
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE,  x);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE,  y);
+   ObjectSetInteger(0, name, OBJPROP_XSIZE,      w);
+   ObjectSetInteger(0, name, OBJPROP_YSIZE,      h);
+   ObjectSetString (0, name, OBJPROP_TEXT,       text);
+   ObjectSetInteger(0, name, OBJPROP_BGCOLOR,    C'40,40,40');
+   ObjectSetInteger(0, name, OBJPROP_COLOR,      CLR_TEXT);
+   ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, C'80,80,80');
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE,   9);
+   ObjectSetInteger(0, name, OBJPROP_CORNER,     CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, name, OBJPROP_BACK,       false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
+   ObjectSetInteger(0, name, OBJPROP_ALIGN,      ALIGN_CENTER);
+}
+
 void SetBtnBg(const string name, color clr)
 {
    ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clr);
@@ -920,9 +973,9 @@ void PanelCreate()
 
    // --- Linha 3: SL | TP
    CreateLabel(PRE "L_SL_T",   x+8,  y+74,  "SL (dist)",     CLR_MUTED, 8);
-   CreateLabel(PRE "L_SL_V",   x+8,  y+86,  "0.00",          CLR_TEXT,  9);
+   CreateEdit (PRE "L_SL_V",   x+6,  y+85,  76, 17, StringFormat("%.2f", g_slDist));
    CreateLabel(PRE "L_TP_T",   x+90, y+74,  "TP (dist)",     CLR_MUTED, 8);
-   CreateLabel(PRE "L_TP_V",   x+90, y+86,  "0.00",          CLR_TEXT,  9);
+   CreateEdit (PRE "L_TP_V",   x+88, y+85,  76, 17, StringFormat("%.2f", g_tpDist));
 
    // --- Linha 4: PnL (só com posição)
    CreateLabel(PRE "L_PNL_T",  x+8,  y+106, "PnL",           CLR_MUTED, 8);
@@ -946,10 +999,11 @@ void PanelCreate()
 
    // --- Velocidade: label + 4 botões
    CreateLabel(PRE "L_SPD",    x+8,  y+246, "Velocidade",    CLR_MUTED, 8);
-   CreateBtn(PRE "SPD1",  x+6,   y+258, 50, 22, "1x",  CLR_SPD_ON);
-   CreateBtn(PRE "SPD2",  x+60,  y+258, 50, 22, "2x",  CLR_SPD_OFF);
-   CreateBtn(PRE "SPD4",  x+114, y+258, 50, 22, "4x",  CLR_SPD_OFF);
-   CreateBtn(PRE "SPD8",  x+168, y+258, 62, 22, "8x",  CLR_SPD_OFF);
+   CreateBtn(PRE "SPD1",  x+6,   y+258, 40, 22, "1x",  CLR_SPD_ON);
+   CreateBtn(PRE "SPD2",  x+50,  y+258, 40, 22, "2x",  CLR_SPD_OFF);
+   CreateBtn(PRE "SPD4",  x+94,  y+258, 40, 22, "4x",  CLR_SPD_OFF);
+   CreateBtn(PRE "SPD8",  x+138, y+258, 40, 22, "8x",  CLR_SPD_OFF);
+   CreateBtn(PRE "SPD16", x+182, y+258, 48, 22, "16x", CLR_SPD_OFF);
 
    CreateRect(PRE "SEP3", x, y+286, PW, 2, CLR_BG2);
 
@@ -972,7 +1026,7 @@ void PanelDelete()
       PRE "L_TP_T", PRE "L_TP_V", PRE "L_PNL_T", PRE "L_PNL_V",
       PRE "SEP1", PRE "SEP2", PRE "SEP3",
       PRE "BUY", PRE "SELL", PRE "CLOSE", PRE "PAUSE",
-      PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8",
+      PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16",
       PRE "L_SPD", PRE "L_SYM", PRE "L_TIMER_T", PRE "L_TIMER_V",
       PRE "RISK_UP", PRE "RISK_DN"
    };
@@ -1022,9 +1076,9 @@ void PanelUpdate()
    }
 
    // Velocidade
-   string speedNames[] = { PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8" };
-   int    speedVals[]  = { 1, 2, 4, 8 };
-   for(int i=0; i<4; i++)
+   string speedNames[] = { PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16" };
+   int    speedVals[]  = { 1, 2, 4, 8, 16 };
+   for(int i=0; i<5; i++)
       SetBtnBg(speedNames[i], (g_speed == speedVals[i]) ? CLR_SPD_ON : CLR_SPD_OFF);
 
    // Pause/Play
