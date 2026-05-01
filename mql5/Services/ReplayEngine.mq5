@@ -87,6 +87,7 @@ void OnStart()
 
    g_startTime = ComputeStartTime(effectiveSession);
    GlobalVariableSet("replay_last_session", (double)effectiveSession);
+   GlobalVariableFlush();   // força persistência imediata no disco (sobrevive a crash/kill)
    PrintFormat("[ReplayEngine] Sessão: %s (origem: %s)",
                TimeToString(effectiveSession, TIME_DATE),
                sessionIsDefault ? "GlobalVariable" : "input");
