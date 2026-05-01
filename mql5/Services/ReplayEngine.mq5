@@ -244,37 +244,42 @@ bool LoadTicksFromBars(datetime startTime)
    double spreadPrice = spreadPts * SymbolInfoDouble(SourceSymbol, SYMBOL_POINT);
    if(spreadPrice <= 0) spreadPrice = TickSize;
 
-   int nTicks = copied * 4;
+   // 60 ticks por minuto (1 por segundo) — em 1x speed bate o cap de Sleep=1000ms
+   // do ReplayLoop e o replay roda em tempo real
+   const int TICKS_PER_MIN = 60;
+   int nTicks = copied * TICKS_PER_MIN;
    ArrayResize(g_ticks, nTicks);
    ArraySetAsSeries(g_ticks, false);
-
-   // Distribui os 4 ticks ao longo do minuto: Open=0s, extremo1=15s, extremo2=45s, Close=59.999s
-   long offsets[4];
-   offsets[0] = 0;
-   offsets[1] = 15000;
-   offsets[2] = 45000;
-   offsets[3] = 59999;
 
    int idx = 0;
    for(int i = 0; i < copied; i++)
    {
-      bool bullish = (rates[i].close >= rates[i].open);
-      long t = (long)rates[i].time * 1000LL;
+      bool   bullish = (rates[i].close >= rates[i].open);
+      long   t  = (long)rates[i].time * 1000LL;
+      double O  = rates[i].open;
+      double L  = rates[i].low;
+      double H  = rates[i].high;
+      double C  = rates[i].close;
+      double m1 = bullish ? L : H;   // primeiro extremo
+      double m2 = bullish ? H : L;   // segundo extremo
 
-      double prices[4];
-      prices[0] = rates[i].open;
-      prices[1] = bullish ? rates[i].low  : rates[i].high;
-      prices[2] = bullish ? rates[i].high : rates[i].low;
-      prices[3] = rates[i].close;
-
-      for(int j = 0; j < 4; j++, idx++)
+      // Interpolação linear: 0-15s O→m1, 15-45s m1→m2, 45-60s m2→C
+      for(int sec = 0; sec < TICKS_PER_MIN; sec++, idx++)
       {
-         long tickMs = t + offsets[j];
+         double price;
+         if(sec < 15)
+            price = O  + (m1 - O ) * (sec / 15.0);
+         else if(sec < 45)
+            price = m1 + (m2 - m1) * ((sec - 15) / 30.0);
+         else
+            price = m2 + (C  - m2) * ((sec - 45) / 15.0);
+
+         long tickMs = t + (long)sec * 1000LL;
          g_ticks[idx].time     = (datetime)(tickMs / 1000);
          g_ticks[idx].time_msc = tickMs;
-         g_ticks[idx].bid      = prices[j];
-         g_ticks[idx].ask      = prices[j] + spreadPrice;
-         g_ticks[idx].last     = prices[j];
+         g_ticks[idx].bid      = price;
+         g_ticks[idx].ask      = price + spreadPrice;
+         g_ticks[idx].last     = price;
          g_ticks[idx].flags    = TICK_FLAG_BID | TICK_FLAG_ASK;
       }
    }
