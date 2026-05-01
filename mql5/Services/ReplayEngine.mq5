@@ -41,6 +41,11 @@ bool    g_stopped    = false;
 datetime g_startTime = 0;
 datetime g_endTime   = 0;
 
+//--- Modo SKIP_TO_BAR_END
+bool     g_skipToBarEnd   = false;
+datetime g_skipTargetTime = 0;
+int      g_savedSpeed     = 1;
+
 //+------------------------------------------------------------------+
 //| OnStart                                                          |
 //+------------------------------------------------------------------+
@@ -402,6 +407,13 @@ void ReplayLoop()
 
       g_cursor++;
 
+      if(g_skipToBarEnd && g_cursor < g_total && g_ticks[g_cursor].time >= g_skipTargetTime)
+      {
+         g_skipToBarEnd = false;
+         g_speed        = g_savedSpeed;
+         PrintFormat("[ReplayEngine] SKIP_TO_BAR_END concluído — velocidade restaurada para %d", g_speed);
+      }
+
       if(g_cursor % 500 == 0)
          WriteStatus(StringFormat("PLAYING speed=%d cursor=%d/%d", g_speed, g_cursor, g_total));
 
@@ -441,9 +453,32 @@ void ProcessCommandFile()
 
    if(cmd == "")              return;
    if(cmd == "PLAY")          { g_paused = false; PrintFormat("[ReplayEngine] CMD PLAY"); return; }
-   if(cmd == "PAUSE")         { g_paused = true;  PrintFormat("[ReplayEngine] CMD PAUSE"); return; }
+   if(cmd == "PAUSE")         { g_paused = true; g_skipToBarEnd = false; PrintFormat("[ReplayEngine] CMD PAUSE"); return; }
    if(cmd == "STOP")          { g_stopped = true; PrintFormat("[ReplayEngine] CMD STOP"); return; }
-   if(cmd == "SKIP")          { g_speed = 999; g_paused = false; Print("[ReplayEngine] CMD SKIP — avançando até o final em velocidade máxima"); return; }
+   if(cmd == "SKIP")          { g_speed = 999; g_paused = false; g_skipToBarEnd = false; Print("[ReplayEngine] CMD SKIP — avançando até o final em velocidade máxima"); return; }
+
+   if(cmd == "SKIP_TO_BAR_END")
+   {
+      if(g_cursor < g_total)
+      {
+         datetime curT     = g_ticks[g_cursor].time;
+         datetime barClose = (datetime)((long)curT / 900 * 900) + 900;
+         datetime target   = barClose - 5;
+         if(target > curT)
+         {
+            g_savedSpeed     = g_speed;
+            g_skipTargetTime = target;
+            g_skipToBarEnd   = true;
+            g_speed          = 999;
+            g_paused         = false;
+            PrintFormat("[ReplayEngine] CMD SKIP_TO_BAR_END — alvo %s (faltam %ds para o close)",
+                        TimeToString(target, TIME_SECONDS), (int)(barClose - curT));
+         }
+         else
+            Print("[ReplayEngine] SKIP_TO_BAR_END ignorado — já dentro dos 5s finais da barra");
+      }
+      return;
+   }
 
    if(StringFind(cmd, "SPEED:") == 0)
    {
@@ -452,6 +487,7 @@ void ProcessCommandFile()
       if(s == 1 || s == 2 || s == 4 || s == 8 || s == 16 || s == 32)
       {
          g_speed = s;
+         g_skipToBarEnd = false;
          PrintFormat("[ReplayEngine] CMD SPEED=%d", g_speed);
       }
       else

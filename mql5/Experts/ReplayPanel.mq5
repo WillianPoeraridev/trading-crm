@@ -47,7 +47,7 @@ input string   SourceSymbol  = "NAS100";
 #define PX  10
 #define PY  30
 #define PW  236
-#define PH  390
+#define PH  400
 
 //+------------------------------------------------------------------+
 //| Struct de posição virtual                                        |
@@ -602,6 +602,12 @@ void HandleButtonClick(const string name)
       return;
    }
 
+   if(name == PRE "SKIP_BAR")
+   {
+      WriteCmd("SKIP_TO_BAR_END");
+      return;
+   }
+
    if(name == PRE "SKIP")
    {
       WriteCmd("SKIP");
@@ -815,7 +821,7 @@ void CreateHLine(const string name, double price, color clr, const string lbl)
    ObjectCreate(0, name, OBJ_HLINE, 0, 0, price);
    ObjectSetInteger(0, name, OBJPROP_COLOR,      clr);
    ObjectSetInteger(0, name, OBJPROP_STYLE,      STYLE_DOT);
-   ObjectSetInteger(0, name, OBJPROP_WIDTH,      3);
+   ObjectSetInteger(0, name, OBJPROP_WIDTH,      1);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
    ObjectSetInteger(0, name, OBJPROP_BACK,       false);
    ObjectSetString (0, name, OBJPROP_TEXT,       lbl);
@@ -824,7 +830,7 @@ void CreateHLine(const string name, double price, color clr, const string lbl)
    ObjectDelete(0, hdl);
    ObjectCreate(0, hdl, OBJ_ARROW_RIGHT_PRICE, 0, TimeCurrent(), price);
    ObjectSetInteger(0, hdl, OBJPROP_COLOR,      clr);
-   ObjectSetInteger(0, hdl, OBJPROP_WIDTH,      2);
+   ObjectSetInteger(0, hdl, OBJPROP_WIDTH,      1);
    ObjectSetInteger(0, hdl, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, hdl, OBJPROP_BACK,       false);
 }
@@ -845,7 +851,7 @@ void CreateLineLabel(const string name, double price, const string text, color c
    ObjectCreate(0, name, OBJ_TEXT, 0, iTime(DestSymbol, PERIOD_M15, 0), price);
    ObjectSetString (0, name, OBJPROP_TEXT,      text);
    ObjectSetInteger(0, name, OBJPROP_COLOR,      clr);
-   ObjectSetInteger(0, name, OBJPROP_FONTSIZE,   8);
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE,   11);
    ObjectSetString (0, name, OBJPROP_FONT,       "Courier New");
    ObjectSetInteger(0, name, OBJPROP_ANCHOR,     above ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
@@ -1118,8 +1124,8 @@ void PanelCreate()
    CreateRect(PRE "SEP1", x, y+168, PW, 2, CLR_BG2);
 
    // --- Botões BUY / SELL
-   CreateBtn(PRE "BUY",   x+6,   y+176, 108, 28, "▲  BUY",  CLR_BUY);
-   CreateBtn(PRE "SELL",  x+122, y+176, 108, 28, "▼  SELL", CLR_SELL);
+   CreateBtn(PRE "SELL",  x+6,   y+176, 108, 28, "▼  SELL", CLR_SELL);
+   CreateBtn(PRE "BUY",   x+122, y+176, 108, 28, "▲  BUY",  CLR_BUY);
 
    // --- Botão FECHAR
    CreateBtn(PRE "CLOSE", x+6,   y+210, 224, 24, "FECHAR POSIÇÃO", CLR_CLOSE);
@@ -1138,11 +1144,12 @@ void PanelCreate()
    CreateRect(PRE "SEP3", x, y+286, PW, 2, CLR_BG2);
 
    // --- Botão PAUSE/PLAY
-   CreateBtn(PRE "PAUSE", x+6,  y+294, 224, 28, "❚❚  PAUSAR",  CLR_PAUSE);
-   CreateBtn(PRE "SKIP",  x+6,  y+328, 224, 22, "⏭  IR AO FINAL", CLR_BG2);
+   CreateBtn(PRE "PAUSE",    x+6, y+294, 224, 28, "❚❚  PAUSAR",        CLR_PAUSE);
+   CreateBtn(PRE "SKIP_BAR", x+6, y+328, 224, 22, "▶▶  FIM DA BARRA",  CLR_BG2);
+   CreateBtn(PRE "SKIP",     x+6, y+354, 224, 22, "⏭  IR AO FINAL",    CLR_BG2);
 
    // --- Rodapé: símbolo
-   CreateLabel(PRE "L_SYM", x+8, y+332, DestSymbol, CLR_MUTED, 8);
+   CreateLabel(PRE "L_SYM", x+8, y+382, DestSymbol, CLR_MUTED, 8);
 
 }
 
@@ -1156,7 +1163,7 @@ void PanelDelete()
       PRE "L_LOT_T", PRE "L_LOT_V", PRE "L_SL_T", PRE "L_SL_V",
       PRE "L_TP_T", PRE "L_TP_V", PRE "L_PNL_T", PRE "L_PNL_V",
       PRE "SEP1", PRE "SEP2", PRE "SEP3",
-      PRE "BUY", PRE "SELL", PRE "CLOSE", PRE "PAUSE", PRE "SKIP",
+      PRE "BUY", PRE "SELL", PRE "CLOSE", PRE "PAUSE", PRE "SKIP_BAR", PRE "SKIP",
       PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16", PRE "SPD32",
       PRE "L_SPD", PRE "L_SYM", PRE "L_TIMER_T", PRE "L_TIMER_V",
       PRE "RISK_UP", PRE "RISK_DN",
