@@ -229,40 +229,35 @@ bool LoadHistoricalBars()
 //+------------------------------------------------------------------+
 bool LoadTicks(datetime startTime)
 {
-   ulong startMs = (ulong)startTime * 1000UL;
-   ArrayResize(g_ticks, MaxTicksPerDay);
-   ArraySetAsSeries(g_ticks, false);
-
-   ResetLastError();
-   int copied = CopyTicks(SourceSymbol, g_ticks, COPY_TICKS_ALL, startMs, MaxTicksPerDay);
-   if(copied <= 0)
-   {
-      PrintFormat("[ReplayEngine] CopyTicks retornou %d (erro=%d)", copied, GetLastError());
-      g_total = 0;
-      return false;
-   }
-   g_total = copied;
-   ArrayResize(g_ticks, g_total);
-   PrintFormat("[ReplayEngine] %d ticks copiados de %s a partir de %s", g_total, SourceSymbol, TimeToString(startTime, TIME_DATE|TIME_SECONDS));
-
-   // Calcular g_endTime e truncar array
+   // Calcular g_endTime PRIMEIRO para delimitar a janela do CopyTicksRange
    bool endIsDefault = (EndDate < D'2000.01.01');
    if(!endIsDefault && EndDate > g_startTime)
       g_endTime = EndDate;
    else
       g_endTime = (datetime)((long)g_startTime / 86400 * 86400 + 86400);
 
-   int endIdx = g_total;
-   for(int i = 0; i < g_total; i++)
+   ulong startMs = (ulong)startTime * 1000UL;
+   ulong endMs   = (ulong)g_endTime  * 1000UL;
+   ArrayResize(g_ticks, MaxTicksPerDay);
+   ArraySetAsSeries(g_ticks, false);
+
+   ResetLastError();
+   int copied = CopyTicksRange(SourceSymbol, g_ticks, COPY_TICKS_ALL, startMs, endMs);
+   if(copied <= 0)
    {
-      if((datetime)(g_ticks[i].time_msc / 1000) >= g_endTime)
-      {
-         endIdx = i;
-         break;
-      }
+      PrintFormat("[ReplayEngine] CopyTicksRange retornou %d (erro=%d) — janela %s → %s (data sem ticks?)",
+                  copied, GetLastError(),
+                  TimeToString(startTime, TIME_DATE|TIME_SECONDS),
+                  TimeToString(g_endTime, TIME_DATE|TIME_SECONDS));
+      g_total = 0;
+      return false;
    }
-   g_total = endIdx;
-   PrintFormat("[ReplayEngine] Replay limitado a %d ticks até %s", g_total, TimeToString(g_endTime, TIME_DATE|TIME_SECONDS));
+   g_total = copied;
+   ArrayResize(g_ticks, g_total);
+   PrintFormat("[ReplayEngine] %d ticks no intervalo %s → %s",
+               g_total,
+               TimeToString(startTime, TIME_DATE|TIME_SECONDS),
+               TimeToString(g_endTime, TIME_DATE|TIME_SECONDS));
    return true;
 }
 
