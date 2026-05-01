@@ -10,8 +10,8 @@
 //--- Inputs configuráveis
 input string   SourceSymbol      = "NAS100";      // símbolo de origem (Fusion Markets)
 input string   DestSymbol        = "NAS100_SIM";  // símbolo custom de destino
-input string   SessionDate       = "0";           // data do replay: "0" = última usada, ou "2026.04.20"
-input string   EndDate           = "0";           // data final: "0" = fim do dia de SessionDate
+input datetime SessionDate = D'1970.01.02 00:00:00'; // data do replay (deixe 02/01/1970 = última usada)
+input datetime EndDate     = D'1970.01.02 00:00:00'; // data final (deixe 02/01/1970 = fim do dia)
 input int      OpeningHour       = 16;            // 16 (padrão) ou 15 (horário verão US)
 input int      OpeningMinute     = 15;
 input double   ContractSize      = 1.0;           // tamanho do contrato (Fusion: 1.0)
@@ -66,7 +66,8 @@ void OnStart()
 
    // Persistência da última data usada
    datetime effectiveSession;
-   bool sessionIsDefault = (SessionDate == "0" || SessionDate == "" || StringLen(SessionDate) < 4);
+   // Sentinel: qualquer data antes de 2000 = "usar padrão"
+   bool sessionIsDefault = (SessionDate < D'2000.01.01');
 
    if(sessionIsDefault)
    {
@@ -76,7 +77,7 @@ void OnStart()
          effectiveSession = TimeCurrent();
    }
    else
-      effectiveSession = StringToTime(SessionDate); // ex: "2026.04.20" → datetime
+      effectiveSession = SessionDate;
 
    g_startTime = ComputeStartTime(effectiveSession);
    GlobalVariableSet("replay_last_session", (double)effectiveSession);
@@ -245,13 +246,11 @@ bool LoadTicks(datetime startTime)
    PrintFormat("[ReplayEngine] %d ticks copiados de %s a partir de %s", g_total, SourceSymbol, TimeToString(startTime, TIME_DATE|TIME_SECONDS));
 
    // Calcular g_endTime e truncar array
-   datetime effectiveEnd;
-   bool endIsDefault = (EndDate == "0" || EndDate == "" || StringLen(EndDate) < 4);
-   if(!endIsDefault)
-      effectiveEnd = StringToTime(EndDate);
+   bool endIsDefault = (EndDate < D'2000.01.01');
+   if(!endIsDefault && EndDate > g_startTime)
+      g_endTime = EndDate;
    else
-      effectiveEnd = (datetime)((long)g_startTime / 86400 * 86400 + 86400);
-   g_endTime = effectiveEnd;
+      g_endTime = (datetime)((long)g_startTime / 86400 * 86400 + 86400);
 
    int endIdx = g_total;
    for(int i = 0; i < g_total; i++)
