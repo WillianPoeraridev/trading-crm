@@ -225,34 +225,29 @@ bool LoadHistoricalBars()
 }
 
 //+------------------------------------------------------------------+
-//| Fallback: gera ticks sintéticos a partir de barras M1            |
-//| Algoritmo: MT5 Strategy Tester "Every Tick" generation           |
+//| Sintetiza ticks a partir de barras OHLC (1 tick por segundo)     |
+//| Interpolação linear: O → primeiro extremo → segundo extremo → C  |
 //+------------------------------------------------------------------+
-bool LoadTicksFromBars(datetime startTime)
+bool SynthesizeTicks(MqlRates &rates[], int count, int barSecs, ENUM_TIMEFRAMES tf)
 {
-   MqlRates rates[];
-   ArraySetAsSeries(rates, false);
-   int copied = CopyRates(SourceSymbol, PERIOD_M1, startTime, g_endTime, rates);
-   if(copied <= 0)
-   {
-      PrintFormat("[ReplayEngine] Fallback: CopyRates M1 falhou também (copied=%d, erro=%d)",
-                  copied, GetLastError());
-      return false;
-   }
-
    long   spreadPts   = SymbolInfoInteger(SourceSymbol, SYMBOL_SPREAD);
    double spreadPrice = spreadPts * SymbolInfoDouble(SourceSymbol, SYMBOL_POINT);
    if(spreadPrice <= 0) spreadPrice = TickSize;
 
-   // 60 ticks por minuto (1 por segundo) — em 1x speed bate o cap de Sleep=1000ms
-   // do ReplayLoop e o replay roda em tempo real
-   const int TICKS_PER_MIN = 60;
-   int nTicks = copied * TICKS_PER_MIN;
+   int nTicks = count * barSecs;
+   if(nTicks > MaxTicksPerDay)
+   {
+      PrintFormat("[ReplayEngine] Aviso: %d ticks excedem buffer %d — truncando", nTicks, MaxTicksPerDay);
+      nTicks = MaxTicksPerDay;
+   }
    ArrayResize(g_ticks, nTicks);
    ArraySetAsSeries(g_ticks, false);
 
+   int stage1End = barSecs / 4;        // 25% — chega no primeiro extremo
+   int stage2End = (barSecs * 3) / 4;  // 75% — chega no segundo extremo
+
    int idx = 0;
-   for(int i = 0; i < copied; i++)
+   for(int i = 0; i < count && idx < nTicks; i++)
    {
       bool   bullish = (rates[i].close >= rates[i].open);
       long   t  = (long)rates[i].time * 1000LL;
@@ -260,19 +255,18 @@ bool LoadTicksFromBars(datetime startTime)
       double L  = rates[i].low;
       double H  = rates[i].high;
       double C  = rates[i].close;
-      double m1 = bullish ? L : H;   // primeiro extremo
-      double m2 = bullish ? H : L;   // segundo extremo
+      double m1 = bullish ? L : H;
+      double m2 = bullish ? H : L;
 
-      // Interpolação linear: 0-15s O→m1, 15-45s m1→m2, 45-60s m2→C
-      for(int sec = 0; sec < TICKS_PER_MIN; sec++, idx++)
+      for(int sec = 0; sec < barSecs && idx < nTicks; sec++, idx++)
       {
          double price;
-         if(sec < 15)
-            price = O  + (m1 - O ) * (sec / 15.0);
-         else if(sec < 45)
-            price = m1 + (m2 - m1) * ((sec - 15) / 30.0);
+         if(sec < stage1End)
+            price = O  + (m1 - O ) * (double)sec / stage1End;
+         else if(sec < stage2End)
+            price = m1 + (m2 - m1) * (double)(sec - stage1End) / (stage2End - stage1End);
          else
-            price = m2 + (C  - m2) * ((sec - 45) / 15.0);
+            price = m2 + (C  - m2) * (double)(sec - stage2End) / (barSecs - stage2End);
 
          long tickMs = t + (long)sec * 1000LL;
          g_ticks[idx].time     = (datetime)(tickMs / 1000);
@@ -286,11 +280,38 @@ bool LoadTicksFromBars(datetime startTime)
 
    g_total = idx;
    ArrayResize(g_ticks, g_total);
-   PrintFormat("[ReplayEngine] Fallback M1→ticks: %d barras → %d ticks sintéticos (%s → %s)",
-               copied, g_total,
-               TimeToString(startTime, TIME_DATE|TIME_SECONDS),
-               TimeToString(g_endTime, TIME_DATE|TIME_SECONDS));
-   return true;
+   PrintFormat("[ReplayEngine] Sintetizados %d ticks a partir de %d barras %s (1 tick/seg)",
+               g_total, count, EnumToString(tf));
+   return g_total > 0;
+}
+
+//+------------------------------------------------------------------+
+//| Fallback adaptativo: tenta M1 → M5 → M15 → H1 até achar dados    |
+//+------------------------------------------------------------------+
+bool LoadTicksFromBars(datetime startTime)
+{
+   ENUM_TIMEFRAMES tfs[4]  = { PERIOD_M1, PERIOD_M5, PERIOD_M15, PERIOD_H1 };
+   int             secs[4] = { 60,        300,       900,        3600      };
+
+   for(int k = 0; k < 4; k++)
+   {
+      MqlRates rates[];
+      ArraySetAsSeries(rates, false);
+      ResetLastError();
+      int copied = CopyRates(SourceSymbol, tfs[k], startTime, g_endTime, rates);
+      if(copied > 0)
+      {
+         PrintFormat("[ReplayEngine] Fallback OK em %s: %d barras no intervalo",
+                     EnumToString(tfs[k]), copied);
+         return SynthesizeTicks(rates, copied, secs[k], tfs[k]);
+      }
+      PrintFormat("[ReplayEngine] %s vazio (erro=%d), tentando timeframe maior...",
+                  EnumToString(tfs[k]), GetLastError());
+   }
+
+   PrintFormat("[ReplayEngine] FALHA: nenhum timeframe (M1/M5/M15/H1) tem dados para %s",
+               TimeToString(startTime, TIME_DATE));
+   return false;
 }
 
 //+------------------------------------------------------------------+
