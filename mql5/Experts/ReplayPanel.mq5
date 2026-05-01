@@ -90,6 +90,8 @@ double          g_point;
 // Risco ajustável em tempo real (inicializado a partir do input RiskPercent)
 double          g_riskPct;
 
+bool            g_editingField = false; // true enquanto usuário edita SL ou TP
+
 int             g_timerCount = 0;
 bool            g_navigated  = false;
 bool            g_scalefixed = false;
@@ -256,7 +258,13 @@ void OnChartEvent(const int id,
                   const string &sparam)
 {
    if(id == CHARTEVENT_OBJECT_CLICK)
+   {
+      if(sparam == PRE "L_SL_V" || sparam == PRE "L_TP_V")
+         g_editingField = true;
+      else
+         g_editingField = false;
       HandleButtonClick(sparam);
+   }
 
    else if(id == CHARTEVENT_OBJECT_DRAG && sparam == SL_LINE)
       HandleSLDrag();
@@ -277,6 +285,7 @@ void OnChartEvent(const int id,
 
    else if(id == CHARTEVENT_OBJECT_ENDEDIT)
    {
+      g_editingField = false;
       if(sparam == PRE "L_SL_V")
       {
          double val = StringToDouble(ObjectGetString(0, PRE "L_SL_V", OBJPROP_TEXT));
@@ -855,6 +864,7 @@ void SetBtnBg(const string name, color clr)
 
 void UpdateSLTPFields()
 {
+   if(g_editingField) return;
    double sl = g_pos.isOpen ? g_pos.slDist : g_slDist;
    double tp = g_pos.isOpen ? g_pos.tpDist : g_tpDist;
    ObjectSetString(0, PRE "L_SL_V", OBJPROP_TEXT, StringFormat("%.2f", sl));
