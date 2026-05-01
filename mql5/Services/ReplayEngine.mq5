@@ -225,6 +225,62 @@ bool LoadHistoricalBars()
 }
 
 //+------------------------------------------------------------------+
+//| Fallback: gera ticks sintéticos a partir de barras M1            |
+//| Algoritmo: MT5 Strategy Tester "Every Tick" generation           |
+//+------------------------------------------------------------------+
+bool LoadTicksFromBars(datetime startTime)
+{
+   MqlRates rates[];
+   ArraySetAsSeries(rates, false);
+   int copied = CopyRates(SourceSymbol, PERIOD_M1, startTime, g_endTime, rates);
+   if(copied <= 0)
+   {
+      PrintFormat("[ReplayEngine] Fallback: CopyRates M1 falhou também (copied=%d, erro=%d)",
+                  copied, GetLastError());
+      return false;
+   }
+
+   long   spreadPts   = SymbolInfoInteger(SourceSymbol, SYMBOL_SPREAD);
+   double spreadPrice = spreadPts * SymbolInfoDouble(SourceSymbol, SYMBOL_POINT);
+   if(spreadPrice <= 0) spreadPrice = TickSize;
+
+   int nTicks = copied * 4;
+   ArrayResize(g_ticks, nTicks);
+   ArraySetAsSeries(g_ticks, false);
+
+   int idx = 0;
+   for(int i = 0; i < copied; i++)
+   {
+      bool bullish = (rates[i].close >= rates[i].open);
+      long t = (long)rates[i].time * 1000LL;
+
+      double prices[4];
+      prices[0] = rates[i].open;
+      prices[1] = bullish ? rates[i].low  : rates[i].high;
+      prices[2] = bullish ? rates[i].high : rates[i].low;
+      prices[3] = rates[i].close;
+
+      for(int j = 0; j < 4; j++, idx++)
+      {
+         g_ticks[idx].time     = (datetime)(t / 1000);
+         g_ticks[idx].time_msc = t + j;
+         g_ticks[idx].bid      = prices[j];
+         g_ticks[idx].ask      = prices[j] + spreadPrice;
+         g_ticks[idx].last     = prices[j];
+         g_ticks[idx].flags    = TICK_FLAG_BID | TICK_FLAG_ASK;
+      }
+   }
+
+   g_total = idx;
+   ArrayResize(g_ticks, g_total);
+   PrintFormat("[ReplayEngine] Fallback M1→ticks: %d barras → %d ticks sintéticos (%s → %s)",
+               copied, g_total,
+               TimeToString(startTime, TIME_DATE|TIME_SECONDS),
+               TimeToString(g_endTime, TIME_DATE|TIME_SECONDS));
+   return true;
+}
+
+//+------------------------------------------------------------------+
 //| Carrega ticks do dia a partir do startTime                       |
 //+------------------------------------------------------------------+
 bool LoadTicks(datetime startTime)
@@ -259,14 +315,11 @@ bool LoadTicks(datetime startTime)
    int copied = CopyTicksRange(SourceSymbol, g_ticks, COPY_TICKS_ALL, startMs, endMs);
    if(copied <= 0)
    {
-      PrintFormat("[ReplayEngine] FALHA: CopyTicksRange retornou %d (erro=%d) na janela %s → %s.",
-                  copied, GetLastError(),
+      PrintFormat("[ReplayEngine] Broker sem ticks para %s → %s (erro=%d). Tentando fallback M1...",
                   TimeToString(startTime, TIME_DATE|TIME_SECONDS),
-                  TimeToString(g_endTime, TIME_DATE|TIME_SECONDS));
-      PrintFormat("[ReplayEngine] Verifique se %s tem ticks dessa data no cache. Abra o gráfico de %s na data e aguarde o download, ou tente outra data.",
-                  SourceSymbol, SourceSymbol);
-      g_total = 0;
-      return false;
+                  TimeToString(g_endTime, TIME_DATE|TIME_SECONDS),
+                  GetLastError());
+      return LoadTicksFromBars(startTime);
    }
    g_total = copied;
    ArrayResize(g_ticks, g_total);
