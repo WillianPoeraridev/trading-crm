@@ -100,6 +100,10 @@ const string SL_LINE = PRE "SL";
 const string TP_LINE = PRE "TP";
 const string EN_LINE = PRE "Entry";
 
+// Posição atual do painel (atualizada ao arrastar)
+int g_px = PX;
+int g_py = PY;
+
 //+------------------------------------------------------------------+
 //| OnInit                                                           |
 //+------------------------------------------------------------------+
@@ -266,6 +270,18 @@ void OnChartEvent(const int id,
 {
    if(id == CHARTEVENT_OBJECT_CLICK)
       HandleButtonClick(sparam);
+
+   else if(id == CHARTEVENT_OBJECT_DRAG && sparam == PRE "BG")
+   {
+      int newX = (int)ObjectGetInteger(0, PRE "BG", OBJPROP_XDISTANCE);
+      int newY = (int)ObjectGetInteger(0, PRE "BG", OBJPROP_YDISTANCE);
+      int dx = newX - g_px;
+      int dy = newY - g_py;
+      g_px = newX;
+      g_py = newY;
+      ShiftPanelObjects(dx, dy);
+      ChartRedraw();
+   }
 
    else if(id == CHARTEVENT_OBJECT_DRAG && sparam == SL_LINE)
    {
@@ -1080,14 +1096,40 @@ void SyncManualObjects()
 }
 
 //+------------------------------------------------------------------+
+//| ShiftPanelObjects — move todos os objetos do painel por (dx,dy)  |
+//+------------------------------------------------------------------+
+void ShiftPanelObjects(int dx, int dy)
+{
+   int total = ObjectsTotal(0, 0, -1);
+   for(int i = 0; i < total; i++)
+   {
+      string name = ObjectName(0, i, 0, -1);
+      if(name == PRE "BG") continue;              // BG já foi movido pelo drag
+      if(StringFind(name, PRE) != 0)  continue;  // só objetos do painel
+      int t = (int)ObjectGetInteger(0, name, OBJPROP_TYPE);
+      if(t == OBJ_LABEL || t == OBJ_BUTTON || t == OBJ_RECTANGLE_LABEL || t == OBJ_EDIT)
+      {
+         ObjectSetInteger(0, name, OBJPROP_XDISTANCE,
+                          (int)ObjectGetInteger(0, name, OBJPROP_XDISTANCE) + dx);
+         ObjectSetInteger(0, name, OBJPROP_YDISTANCE,
+                          (int)ObjectGetInteger(0, name, OBJPROP_YDISTANCE) + dy);
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
 //| PanelCreate — cria todos os objetos uma vez                      |
 //+------------------------------------------------------------------+
 void PanelCreate()
 {
-   int x = PX, y = PY;
+   int x = g_px, y = g_py;
 
    // Fundo principal
    CreateRect(PRE "BG", x, y, PW, PH, CLR_BG);
+   ObjectSetInteger(0, PRE "BG", OBJPROP_SELECTABLE,  true);
+   ObjectSetInteger(0, PRE "BG", OBJPROP_SELECTED,    false);
+   ObjectSetInteger(0, PRE "BG", OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, PRE "BG", OBJPROP_COLOR,       C'65,65,80');
 
    // --- Linha 1: Capital
    CreateLabel(PRE "L_CAP_T",  x+8,  y+8,   "Capital",       CLR_MUTED, 8);
