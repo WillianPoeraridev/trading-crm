@@ -46,7 +46,7 @@ input string   SourceSymbol  = "NAS100";
 #define PX  10
 #define PY  30
 #define PW  236
-#define PH  360
+#define PH  390
 
 //+------------------------------------------------------------------+
 //| Struct de posição virtual                                        |
@@ -592,6 +592,12 @@ void HandleButtonClick(const string name)
       return;
    }
 
+   if(name == PRE "SKIP")
+   {
+      WriteCmd("SKIP");
+      return;
+   }
+
    // Botões de velocidade
    string speedNames[] = { PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16", PRE "SPD32" };
    int    speedVals[]  = { 1, 2, 4, 8, 16, 32 };
@@ -1111,6 +1117,7 @@ void PanelCreate()
 
    // --- Botão PAUSE/PLAY
    CreateBtn(PRE "PAUSE", x+6,  y+294, 224, 28, "❚❚  PAUSAR",  CLR_PAUSE);
+   CreateBtn(PRE "SKIP",  x+6,  y+328, 224, 22, "⏭  IR AO FINAL", CLR_BG2);
 
    // --- Rodapé: símbolo
    CreateLabel(PRE "L_SYM", x+8, y+332, DestSymbol, CLR_MUTED, 8);
@@ -1127,7 +1134,7 @@ void PanelDelete()
       PRE "L_LOT_T", PRE "L_LOT_V", PRE "L_SL_T", PRE "L_SL_V",
       PRE "L_TP_T", PRE "L_TP_V", PRE "L_PNL_T", PRE "L_PNL_V",
       PRE "SEP1", PRE "SEP2", PRE "SEP3",
-      PRE "BUY", PRE "SELL", PRE "CLOSE", PRE "PAUSE",
+      PRE "BUY", PRE "SELL", PRE "CLOSE", PRE "PAUSE", PRE "SKIP",
       PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16", PRE "SPD32",
       PRE "L_SPD", PRE "L_SYM", PRE "L_TIMER_T", PRE "L_TIMER_V",
       PRE "RISK_UP", PRE "RISK_DN",

@@ -21,6 +21,7 @@ input string   ProfitCurrency    = "USD";
 input string   BaseCurrency      = "USD";
 input string   MarginCurrency    = "USD";
 input int      SpeedDefault      = 1;             // 1, 2, 4, 8, 16 ou 32
+input datetime EndDate           = 0;             // data final do replay (0 = fim do dia de SessionDate)
 input int      MaxTicksPerDay    = 500000;        // capacidade do buffer de ticks
 input int      AtrPeriod         = 10;            // período do ATR
 input ENUM_TIMEFRAMES AtrTimeframe = PERIOD_M15;  // timeframe do ATR
@@ -38,6 +39,7 @@ int     g_speed      = 1;
 bool    g_paused     = false;
 bool    g_stopped    = false;
 datetime g_startTime = 0;
+datetime g_endTime   = 0;
 
 //+------------------------------------------------------------------+
 //| OnStart                                                          |
@@ -222,6 +224,24 @@ bool LoadTicks(datetime startTime)
    g_total = copied;
    ArrayResize(g_ticks, g_total);
    PrintFormat("[ReplayEngine] %d ticks copiados de %s a partir de %s", g_total, SourceSymbol, TimeToString(startTime, TIME_DATE|TIME_SECONDS));
+
+   // Calcular g_endTime e truncar array
+   if(EndDate > 0 && EndDate > g_startTime)
+      g_endTime = EndDate;
+   else
+      g_endTime = (datetime)((long)g_startTime / 86400 * 86400 + 86400); // fim do dia de startTime
+
+   int endIdx = g_total;
+   for(int i = 0; i < g_total; i++)
+   {
+      if((datetime)(g_ticks[i].time_msc / 1000) >= g_endTime)
+      {
+         endIdx = i;
+         break;
+      }
+   }
+   g_total = endIdx;
+   PrintFormat("[ReplayEngine] Replay limitado a %d ticks até %s", g_total, TimeToString(g_endTime, TIME_DATE|TIME_SECONDS));
    return true;
 }
 
@@ -266,9 +286,12 @@ void ReplayLoop()
       if(g_cursor % 500 == 0)
          WriteStatus(StringFormat("PLAYING speed=%d cursor=%d/%d", g_speed, g_cursor, g_total));
 
-      long sleepMs = deltaMs / MathMax(g_speed, 1);
-      if(sleepMs > 0)
-         Sleep((uint)MathMin(sleepMs, 1000));
+      if(g_speed < 999)
+      {
+         long sleepMs = deltaMs / MathMax(g_speed, 1);
+         if(sleepMs > 0)
+            Sleep((uint)MathMin(sleepMs, 1000));
+      }
    }
 }
 
@@ -301,6 +324,7 @@ void ProcessCommandFile()
    if(cmd == "PLAY")          { g_paused = false; PrintFormat("[ReplayEngine] CMD PLAY"); return; }
    if(cmd == "PAUSE")         { g_paused = true;  PrintFormat("[ReplayEngine] CMD PAUSE"); return; }
    if(cmd == "STOP")          { g_stopped = true; PrintFormat("[ReplayEngine] CMD STOP"); return; }
+   if(cmd == "SKIP")          { g_speed = 999; g_paused = false; Print("[ReplayEngine] CMD SKIP — avançando até o final em velocidade máxima"); return; }
 
    if(StringFind(cmd, "SPEED:") == 0)
    {
