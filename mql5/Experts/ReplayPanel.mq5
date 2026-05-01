@@ -888,8 +888,9 @@ void UpdateLineLabels()
    double tpPct  = tpUsd / g_capital * 100.0;
    string tpText = StringFormat("▲ %d pts  +$%.2f  %.1f%%", tpPts, tpUsd, tpPct);
 
-   CreateLineLabel(PRE "LBL_SL", g_pos.slPrice, slText, clrRed,  false);
-   CreateLineLabel(PRE "LBL_TP", g_pos.tpPrice, tpText, clrLime, true);
+   bool isShort = (g_pos.direction == "SHORT");
+   CreateLineLabel(PRE "LBL_SL", g_pos.slPrice, slText, clrRed,   isShort);
+   CreateLineLabel(PRE "LBL_TP", g_pos.tpPrice, tpText, clrLime, !isShort);
 }
 
 //+------------------------------------------------------------------+
