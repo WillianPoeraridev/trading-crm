@@ -290,6 +290,7 @@ void OnChartEvent(const int id,
                DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
             }
          }
+         UpdateSLTPFields();
          PanelUpdate();
       }
       else if(sparam == PRE "L_TP_V")
@@ -305,6 +306,7 @@ void OnChartEvent(const int id,
                DrawLines(g_pos.entryPrice, g_pos.slPrice, g_pos.tpPrice);
             }
          }
+         UpdateSLTPFields();
          PanelUpdate();
       }
    }
@@ -445,6 +447,7 @@ void OpenPosition(string direction)
    DrawLines(entry, g_pos.slPrice, g_pos.tpPrice);
    SyncLinesToOtherCharts();
    TakeScreenshot("open_" + direction + "_" + IntegerToString((int)t.time));
+   UpdateSLTPFields();
    PanelUpdate();
    ChartRedraw();
 
@@ -480,6 +483,7 @@ void ClosePosition(double exitPrice, string reason, const MqlTick &t)
    RemoveLinesFromOtherCharts();
 
    g_pos.isOpen = false;
+   UpdateSLTPFields();
    PanelUpdate();
    ChartRedraw();
 
@@ -500,6 +504,7 @@ void HandleSLDrag()
    g_slDist      = g_pos.slDist;
 
    SyncLinesToOtherCharts();
+   UpdateSLTPFields();
    PanelUpdate();
 }
 
@@ -516,6 +521,7 @@ void HandleTPDrag()
    g_tpDist      = g_pos.tpDist;
 
    SyncLinesToOtherCharts();
+   UpdateSLTPFields();
    PanelUpdate();
 }
 
@@ -847,6 +853,14 @@ void SetBtnBg(const string name, color clr)
    ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clr);
 }
 
+void UpdateSLTPFields()
+{
+   double sl = g_pos.isOpen ? g_pos.slDist : g_slDist;
+   double tp = g_pos.isOpen ? g_pos.tpDist : g_tpDist;
+   ObjectSetString(0, PRE "L_SL_V", OBJPROP_TEXT, StringFormat("%.2f", sl));
+   ObjectSetString(0, PRE "L_TP_V", OBJPROP_TEXT, StringFormat("%.2f", tp));
+}
+
 //+------------------------------------------------------------------+
 //| SyncLinesToOtherCharts — replica EN/SL/TP nos gráficos M5 e H1  |
 //+------------------------------------------------------------------+
@@ -1061,9 +1075,8 @@ void PanelUpdate()
    SetLabel(PRE "L_RSK_V", StringFormat("%.1f%%", g_riskPct));
    SetLabel(PRE "L_LOT_V", StringFormat("%.2f", lot));
 
-   // SL / TP
-   SetLabel(PRE "L_SL_V", StringFormat("%.2f", sl));
-   SetLabel(PRE "L_TP_V", StringFormat("%.2f", tp));
+   // SL / TP — não atualiza aqui para não sobrescrever digitação do usuário
+   // Atualizado explicitamente por UpdateSLTPFields()
 
    // PnL flutuante
    if(g_pos.isOpen)
