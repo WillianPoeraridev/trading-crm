@@ -28,7 +28,7 @@ TERMINAL_ROOT = Path(
 # Executável do MetaEditor (compilador do MT5)
 # Ajuste o caminho se o MT5 estiver instalado em local diferente
 METAEDITOR = Path(
-    r"C:\Program Files\MetaTrader 5\metaeditor64.exe"
+    r"C:\Program Files\Fusion Markets MetaTrader 5\MetaEditor64.exe"
 )
 
 # Mapeamento: origem → destino
@@ -104,17 +104,17 @@ def clear_and_copy(src: Path, dst: Path, name: str):
     return True
 
 
-def compile_file(mq5_path: Path) -> bool:
+def compile_file(mq5_path: Path, metaeditor: Path) -> bool:
     """Compila um arquivo .mq5 usando o MetaEditor em modo silencioso."""
-    if not METAEDITOR.exists():
-        err(f"MetaEditor não encontrado em: {METAEDITOR}")
+    if not metaeditor.exists():
+        err(f"MetaEditor não encontrado em: {metaeditor}")
         err("Ajuste a variável METAEDITOR no topo do script.")
         return False
 
     log_path = mq5_path.with_suffix(".log")
 
     cmd = [
-        str(METAEDITOR),
+        str(metaeditor),
         f"/compile:{mq5_path}",
         f"/log:{log_path}",
     ]
@@ -183,20 +183,19 @@ def main():
     # 2. Compilar
     title("ETAPA 2 — Compilando no MetaEditor")
 
-    if not METAEDITOR.exists():
+    metaeditor = METAEDITOR
+    if not metaeditor.exists():
         # Tenta localizar o MetaEditor automaticamente
         candidates = [
             Path(r"C:\Program Files\MetaTrader 5\metaeditor64.exe"),
             Path(r"C:\Program Files (x86)\MetaTrader 5\metaeditor64.exe"),
             Path(r"C:\Program Files\MetaTrader 5 (Fusion Markets)\metaeditor64.exe"),
         ]
-        found = next((p for p in candidates if p.exists()), None)
-        if found:
-            info(f"MetaEditor encontrado em: {found}")
-            global METAEDITOR
-            METAEDITOR = found
+        metaeditor = next((p for p in candidates if p.exists()), None)
+        if metaeditor:
+            info(f"MetaEditor encontrado em: {metaeditor}")
         else:
-            err("MetaEditor não encontrado. Copiar os caminhos possíveis:")
+            err("MetaEditor não encontrado. Caminhos tentados:")
             for c in candidates:
                 print(f"    {c}")
             err("Ajuste a variável METAEDITOR no topo do script e execute novamente.")
@@ -213,7 +212,7 @@ def main():
             continue
         for f in files:
             time.sleep(0.5)  # pequena pausa entre compilações
-            if compile_file(f):
+            if compile_file(f, metaeditor):
                 total_ok += 1
             else:
                 total_fail += 1
