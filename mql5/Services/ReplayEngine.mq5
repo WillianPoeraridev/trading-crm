@@ -10,7 +10,7 @@
 //--- Inputs configuráveis
 input string   SourceSymbol      = "NAS100";      // símbolo de origem (Fusion Markets)
 input string   DestSymbol        = "NAS100_SIM";  // símbolo custom de destino
-input datetime SessionDate = D'1970.01.02 00:00:00'; // data do replay (deixe 02/01/1970 = última usada)
+input datetime SessionDate = D'2026.04.01 00:00:00'; // data do replay (deixe 02/01/1970 = última usada)
 input datetime EndDate     = D'1970.01.02 00:00:00'; // data final (deixe 02/01/1970 = fim do dia)
 input int      OpeningHour       = 16;            // 16 (padrão) ou 15 (horário verão US)
 input int      OpeningMinute     = 15;
