@@ -238,6 +238,20 @@ bool LoadTicks(datetime startTime)
 
    ulong startMs = (ulong)startTime * 1000UL;
    ulong endMs   = (ulong)g_endTime  * 1000UL;
+
+   // Prime tick cache — força o terminal a baixar a faixa do servidor antes da cópia definitiva
+   MqlTick primer[];
+   int primerTries = 0;
+   while(primerTries < 25)
+   {
+      ResetLastError();
+      int probe = CopyTicksRange(SourceSymbol, primer, COPY_TICKS_ALL, startMs, startMs + 60000UL);
+      if(probe > 0) break;
+      Sleep(200);
+      primerTries++;
+   }
+   PrintFormat("[ReplayEngine] Tick sync: %d tentativa(s) (último erro=%d)", primerTries, GetLastError());
+
    ArrayResize(g_ticks, MaxTicksPerDay);
    ArraySetAsSeries(g_ticks, false);
 
@@ -245,10 +259,12 @@ bool LoadTicks(datetime startTime)
    int copied = CopyTicksRange(SourceSymbol, g_ticks, COPY_TICKS_ALL, startMs, endMs);
    if(copied <= 0)
    {
-      PrintFormat("[ReplayEngine] CopyTicksRange retornou %d (erro=%d) — janela %s → %s (data sem ticks?)",
+      PrintFormat("[ReplayEngine] FALHA: CopyTicksRange retornou %d (erro=%d) na janela %s → %s.",
                   copied, GetLastError(),
                   TimeToString(startTime, TIME_DATE|TIME_SECONDS),
                   TimeToString(g_endTime, TIME_DATE|TIME_SECONDS));
+      PrintFormat("[ReplayEngine] Verifique se %s tem ticks dessa data no cache. Abra o gráfico de %s na data e aguarde o download, ou tente outra data.",
+                  SourceSymbol, SourceSymbol);
       g_total = 0;
       return false;
    }
