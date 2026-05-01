@@ -10,8 +10,8 @@
 //--- Inputs configuráveis
 input string   SourceSymbol      = "NAS100";      // símbolo de origem (Fusion Markets)
 input string   DestSymbol        = "NAS100_SIM";  // símbolo custom de destino
-input datetime SessionDate       = 0;             // data do replay (0 = última usada ou hoje)
-input datetime EndDate           = 0;             // data final do replay (0 = fim do dia de SessionDate)
+input string   SessionDate       = "0";           // data do replay: "0" = última usada, ou "2026.04.20"
+input string   EndDate           = "0";           // data final: "0" = fim do dia de SessionDate
 input int      OpeningHour       = 16;            // 16 (padrão) ou 15 (horário verão US)
 input int      OpeningMinute     = 15;
 input double   ContractSize      = 1.0;           // tamanho do contrato (Fusion: 1.0)
@@ -66,7 +66,7 @@ void OnStart()
 
    // Persistência da última data usada
    datetime effectiveSession;
-   bool sessionIsDefault = (SessionDate == 0 || SessionDate < 86400);
+   bool sessionIsDefault = (SessionDate == "0" || SessionDate == "" || StringLen(SessionDate) < 4);
 
    if(sessionIsDefault)
    {
@@ -76,10 +76,13 @@ void OnStart()
          effectiveSession = TimeCurrent();
    }
    else
-      effectiveSession = SessionDate;
+      effectiveSession = StringToTime(SessionDate); // ex: "2026.04.20" → datetime
 
    g_startTime = ComputeStartTime(effectiveSession);
    GlobalVariableSet("replay_last_session", (double)effectiveSession);
+   PrintFormat("[ReplayEngine] Sessão: %s (origem: %s)",
+               TimeToString(effectiveSession, TIME_DATE),
+               sessionIsDefault ? "GlobalVariable" : "input");
 
    PrintFormat("[ReplayEngine] Início do replay: %s (epoch %I64d)", TimeToString(g_startTime, TIME_DATE|TIME_SECONDS), (long)g_startTime);
 
@@ -242,10 +245,13 @@ bool LoadTicks(datetime startTime)
    PrintFormat("[ReplayEngine] %d ticks copiados de %s a partir de %s", g_total, SourceSymbol, TimeToString(startTime, TIME_DATE|TIME_SECONDS));
 
    // Calcular g_endTime e truncar array
-   if(EndDate > 0 && EndDate > g_startTime)
-      g_endTime = EndDate;
+   datetime effectiveEnd;
+   bool endIsDefault = (EndDate == "0" || EndDate == "" || StringLen(EndDate) < 4);
+   if(!endIsDefault)
+      effectiveEnd = StringToTime(EndDate);
    else
-      g_endTime = (datetime)((long)g_startTime / 86400 * 86400 + 86400); // fim do dia de startTime
+      effectiveEnd = (datetime)((long)g_startTime / 86400 * 86400 + 86400);
+   g_endTime = effectiveEnd;
 
    int endIdx = g_total;
    for(int i = 0; i < g_total; i++)
