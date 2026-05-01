@@ -222,7 +222,7 @@ void OnTimer()
          if(ChartSymbol(chartId) == DestSymbol)
          {
             ChartSetInteger(chartId, CHART_AUTOSCROLL, false);
-            ChartSetInteger(chartId, CHART_SHIFT,      false);
+            ChartSetInteger(chartId, CHART_SHIFT,      true);
             ChartNavigate(chartId, CHART_END, 0);
 
             // Pega preço atual do símbolo para centralizar a escala
