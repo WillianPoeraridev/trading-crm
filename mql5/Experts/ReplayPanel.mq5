@@ -555,9 +555,9 @@ void HandleButtonClick(const string name)
    }
 
    // Botões de velocidade
-   string speedNames[] = { PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16" };
-   int    speedVals[]  = { 1, 2, 4, 8, 16 };
-   for(int i=0; i<5; i++)
+   string speedNames[] = { PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16", PRE "SPD32" };
+   int    speedVals[]  = { 1, 2, 4, 8, 16, 32 };
+   for(int i=0; i<6; i++)
    {
       if(name == speedNames[i])
       {
@@ -1010,11 +1010,12 @@ void PanelCreate()
 
    // --- Velocidade: label + 4 botões
    CreateLabel(PRE "L_SPD",    x+8,  y+246, "Velocidade",    CLR_MUTED, 8);
-   CreateBtn(PRE "SPD1",  x+6,   y+258, 40, 22, "1x",  CLR_SPD_ON);
-   CreateBtn(PRE "SPD2",  x+50,  y+258, 40, 22, "2x",  CLR_SPD_OFF);
-   CreateBtn(PRE "SPD4",  x+94,  y+258, 40, 22, "4x",  CLR_SPD_OFF);
-   CreateBtn(PRE "SPD8",  x+138, y+258, 40, 22, "8x",  CLR_SPD_OFF);
-   CreateBtn(PRE "SPD16", x+182, y+258, 48, 22, "16x", CLR_SPD_OFF);
+   CreateBtn(PRE "SPD1",  x+6,   y+258, 36, 22, "1x",  CLR_SPD_ON);
+   CreateBtn(PRE "SPD2",  x+44,  y+258, 36, 22, "2x",  CLR_SPD_OFF);
+   CreateBtn(PRE "SPD4",  x+82,  y+258, 36, 22, "4x",  CLR_SPD_OFF);
+   CreateBtn(PRE "SPD8",  x+120, y+258, 36, 22, "8x",  CLR_SPD_OFF);
+   CreateBtn(PRE "SPD16", x+158, y+258, 36, 22, "16x", CLR_SPD_OFF);
+   CreateBtn(PRE "SPD32", x+196, y+258, 36, 22, "32x", CLR_SPD_OFF);
 
    CreateRect(PRE "SEP3", x, y+286, PW, 2, CLR_BG2);
 
@@ -1037,7 +1038,7 @@ void PanelDelete()
       PRE "L_TP_T", PRE "L_TP_V", PRE "L_PNL_T", PRE "L_PNL_V",
       PRE "SEP1", PRE "SEP2", PRE "SEP3",
       PRE "BUY", PRE "SELL", PRE "CLOSE", PRE "PAUSE",
-      PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16",
+      PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16", PRE "SPD32",
       PRE "L_SPD", PRE "L_SYM", PRE "L_TIMER_T", PRE "L_TIMER_V",
       PRE "RISK_UP", PRE "RISK_DN"
    };
@@ -1087,9 +1088,9 @@ void PanelUpdate()
    }
 
    // Velocidade
-   string speedNames[] = { PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16" };
-   int    speedVals[]  = { 1, 2, 4, 8, 16 };
-   for(int i=0; i<5; i++)
+   string speedNames[] = { PRE "SPD1", PRE "SPD2", PRE "SPD4", PRE "SPD8", PRE "SPD16", PRE "SPD32" };
+   int    speedVals[]  = { 1, 2, 4, 8, 16, 32 };
+   for(int i=0; i<6; i++)
       SetBtnBg(speedNames[i], (g_speed == speedVals[i]) ? CLR_SPD_ON : CLR_SPD_OFF);
 
    // Pause/Play
