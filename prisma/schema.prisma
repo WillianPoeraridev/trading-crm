@@ -40,6 +40,11 @@ model Trade {
   hit3R           Boolean?
   hit4R           Boolean?
   hit5R           Boolean?
+  capitalInicial  Float?
+  riskPct         Float?
+  lotSize         Float?
+  slPoints        Float?
+  tpPoints        Float?
   patternId       String?
   pattern         Pattern?    @relation(fields: [patternId], references: [id])
   screenshotUrl   String?

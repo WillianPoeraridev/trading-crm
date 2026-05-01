@@ -33,6 +33,11 @@ const tradeSchema = z.object({
   patternId: z.string().nullable().optional(),
   screenshotUrl: z.string().url().nullable().optional(),
   notes: z.string().nullable().optional(),
+  capitalInicial: z.number().nullable().optional(),
+  riskPct: z.number().nullable().optional(),
+  lotSize: z.number().nullable().optional(),
+  slPoints: z.number().nullable().optional(),
+  tpPoints: z.number().nullable().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -61,8 +66,8 @@ export async function POST(request: NextRequest) {
   const mfePrice =
     d.mfePoints != null
       ? d.direction === 'LONG'
-        ? d.entryPrice + d.mfePoints
-        : d.entryPrice - d.mfePoints
+        ? d.entryPrice + d.mfePoints * 0.01
+        : d.entryPrice - d.mfePoints * 0.01
       : null
 
   let rrPlanned: number
@@ -122,6 +127,11 @@ export async function POST(request: NextRequest) {
       patternId: d.patternId ?? null,
       screenshotUrl: d.screenshotUrl ?? null,
       notes: d.notes ?? null,
+      capitalInicial: d.capitalInicial ?? null,
+      riskPct: d.riskPct ?? null,
+      lotSize: d.lotSize ?? null,
+      slPoints: d.slPoints ?? null,
+      tpPoints: d.tpPoints ?? null,
     },
   })
 

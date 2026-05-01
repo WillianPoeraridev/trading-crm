@@ -26,6 +26,7 @@ input string   SourceSymbol  = "NAS100";
 //+------------------------------------------------------------------+
 #define PRE          "RP_"
 #define CMD_FILE     "replay_cmd.txt"
+#define STATUS_FILE  "replay_status.txt"
 #define FALLBACK_CSV "fallback_trades.csv"
 
 // Cores do painel
@@ -200,6 +201,21 @@ void OnTick()
    {
       UpdateMaeMfe(t);
       MonitorPosition(t);
+   }
+
+   // Fecha posição se o replay terminou via SKIP
+   if(g_pos.isOpen)
+   {
+      string status = ReadStatusFile();
+      if(StringFind(status, "FINISHED") >= 0)
+      {
+         MqlTick tFinal;
+         if(SymbolInfoTick(DestSymbol, tFinal))
+         {
+            double exitPx = (g_pos.direction == "LONG") ? tFinal.bid : tFinal.ask;
+            ClosePosition(exitPx, "MANUAL", tFinal);
+         }
+      }
    }
 
    PanelUpdate();
@@ -616,6 +632,18 @@ void HandleButtonClick(const string name)
 //+------------------------------------------------------------------+
 //| WriteCmd — escreve comando em replay_cmd.txt                     |
 //+------------------------------------------------------------------+
+string ReadStatusFile()
+{
+   if(!FileIsExist(STATUS_FILE)) return "";
+   int h = FileOpen(STATUS_FILE, FILE_READ | FILE_TXT | FILE_ANSI);
+   if(h == INVALID_HANDLE) return "";
+   string s = FileReadString(h);
+   FileClose(h);
+   StringTrimRight(s);
+   StringTrimLeft(s);
+   return s;
+}
+
 void WriteCmd(const string cmd)
 {
    int h = FileOpen(CMD_FILE, FILE_WRITE | FILE_TXT | FILE_ANSI);
@@ -673,8 +701,8 @@ string BuildJson(double exitPrice, string reason, datetime exitTime,
       "\"hit4R\":"      + BoolStr(g_pos.hit[4]) + ","
       "\"hit5R\":"      + BoolStr(g_pos.hit[5]) + ","
       "\"lotSize\":"    + DoubleToString(g_pos.lotSize, 2) + ","
-      "\"slDist\":"     + DoubleToString(g_pos.slDist, 2) + ","
-      "\"tpDist\":"     + DoubleToString(g_pos.tpDist, 2) + ","
+      "\"slPoints\":"   + IntegerToString((int)MathRound(g_pos.slDist / g_point)) + ","
+      "\"tpPoints\":"   + IntegerToString((int)MathRound(g_pos.tpDist / g_point)) + ","
       "\"capitalInicial\":" + DoubleToString(g_pos.capitalAtEntry, 2) + ","
       "\"riskPct\":"    + DoubleToString(g_riskPct, 1) + ","
       "\"pnlNet\":"     + DoubleToString(pnlNet, 2) + ","
