@@ -827,7 +827,7 @@ void CreateEdit(const string name, int x, int y, int w, int h, const string text
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE,   9);
    ObjectSetInteger(0, name, OBJPROP_CORNER,     CORNER_LEFT_UPPER);
    ObjectSetInteger(0, name, OBJPROP_BACK,       false);
-   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, name, OBJPROP_ALIGN,      ALIGN_CENTER);
 }
 
